@@ -913,3 +913,23 @@ a separate written approval decision; neither exists.
   correction entry above referring to one; the Phase 1 implementation
   details (endpoints, HMAC auth, registry seeding) still need a proper
   dated entry when the Phase 1 commit is made.
+
+### 2026-11-12 — Post-roadmap: deployment tutorials + interactive installer
+- Added `docs/operations/deployment-1-server-dev.md` (single-server
+  dev topology: Compose and native paths, first-run walkthrough,
+  worker commands, limitations) and
+  `docs/operations/deployment-6-server.md` (minimum production
+  topology: app / workers+coordinator / data / 3 participants on
+  separate hosts, network zones, per-server steps, go-live
+  checklist; MPC tier provisioning-only until the review gate).
+- Added `scripts/install.sh`: interactive step-by-step installer
+  for the one-server dev topology (Compose or native), fresh-secret
+  .env generation, migrations + seeds, optional superuser, health
+  probes; supports `--dry-run` and `--yes`. README links both
+  tutorials and the installer.
+- VERIFIED: `bash -n` syntax check; full `--yes --dry-run` walk
+  completed all 8 steps cleanly in native mode (no Docker in this
+  VM; detection fell back correctly) and modified nothing.
+  NOT verified: a real end-to-end install run (would mutate the
+  dev environment), Compose execution (no Docker), interactive
+  TTY prompts (dry-run used --yes).

@@ -120,6 +120,18 @@ ADRs: [`docs/adr/`](docs/adr/) · Threat model:
 
 ### Option A — local development (fastest)
 
+**Automated:** the interactive installer performs the whole
+single-server setup step by step, with confirmations:
+
+```bash
+git clone https://github.com/zeroexlive/Custodium.git
+cd Custodium
+./scripts/install.sh            # --dry-run previews, --yes accepts defaults
+```
+
+Tutorial: [`docs/operations/deployment-1-server-dev.md`](docs/operations/deployment-1-server-dev.md).
+Manual equivalent:
+
 ```bash
 git clone https://github.com/zeroexlive/Custodium.git
 cd Custodium
@@ -265,7 +277,10 @@ infrastructure/   Deployment assets
 
 Start with the [product requirements](docs/prd/product-requirements.md),
 the [roadmap & phase records](docs/roadmap/backlog.md), and the
-[operations runbooks](docs/operations/). `AGENTS.md` carries the binding
+[operations runbooks](docs/operations/) — including the deployment
+tutorials: [one-server development](docs/operations/deployment-1-server-dev.md)
+and the [six-server minimum production topology](docs/operations/deployment-6-server.md).
+`AGENTS.md` carries the binding
 contribution rules and the append-only engineering history — every work
 session records what was done, what was actually verified, and what remains.
 
