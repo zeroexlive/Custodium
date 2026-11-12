@@ -61,8 +61,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
 | 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
 | 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
-| 5 | Blockchain Indexing & Lookup | Implemented 2026-11-12 — EVM scanner, deposit lifecycle, reorg reversal, lookup API live; live-chain scanning NOT verified (sandbox egress; see history) |
-| 6 | TRON | Planned |
+| 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
+| 6 | TRON | Implemented 2026-11-12 — addresses, protobuf builders, provider, pipeline, indexing; live-node verification NOT done (sandbox egress; see history) |
 | 7 | Solana | Planned |
 | 8 | TON | Planned |
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Planned |
@@ -556,6 +556,51 @@ Full record: `docs/architecture/phase-5-indexing.md`.
   on-chain balance cross-check endpoint (awaits RPC access);
   non-EVM scanners (land with Phases 6–8). No mainnet enablement;
   signing gate unchanged.
+- Outcome: snapshot push (22 paths) → branch commit
+  `50fa653a1b6b44194951dfb45423905f6c8e8be6`; PR **#6** merged to
+  `main`, merge commit `2fe030ffd023b82641e04f41cee066ff8a284ed0`,
+  verified via GitHub API (main = [P5 merge, P5, P4 merge, ...]).
+  Sync record appended (6 entries). Local branches realigned; this
+  note rides the Phase 6 commit. Next: Phase 6 (TRON).
+
+### 2026-11-12 — Phase 6 COMPLETE (TRON)
+Full record: `docs/blockchains/tron-implementation.md`.
+- **New module `waas/modules/tron/`** (chains `tron`, `tron-nile`;
+  19-confirmation registry policy): Base58Check addresses
+  (checksum-verified, USDT pair `41a614f8…`↔`TR7NHqje…` tested
+  both directions); minimal canonical protobuf encoder with field
+  numbers **verified against the official tronprotocol/protocol
+  sources fetched this session** (notably ref_block_num=3, not 2);
+  TransferContract + TRC-20 TriggerSmartContract builders
+  (txID = sha256(raw)); TronGrid-style provider (failover,
+  idempotent broadcast by txID); withdrawal pipeline with Phase 4
+  semantics (signer port signs the txID digest; signature r‖s‖v
+  with v by trial recovery to the wallet's TRON address; unknown
+  broadcast outcome → dropped + reservation HELD); TRON scanner
+  on the Phase 5 framework (native from blocks, TRC-20 from
+  tx-info logs; shared lifecycle via new public wrappers in
+  indexing.services); lookup + reconciliation extended to TRON
+  withdrawals; run_indexer dispatches by family.
+- Two real bugs caught by tests mid-build: TRON hex form is
+  canonical lowercase (EVM helper returns EIP-55 case — fixed at
+  derivation), and the ledger reservation API's true signature
+  (scope = reservation external_ref, returns BalanceReservation —
+  my first TRON calls used invented kwargs; fixed to Phase 4's
+  exact usage).
+- VERIFIED (actually run): backend `pytest` **110 passed, 1
+  skipped**; ruff clean. Golden-bytes test: expected raw TRX
+  transaction hand-assembled from protocol field numbers equals
+  the builder output byte-for-byte, txID = its sha256. Pipeline
+  vs in-memory TronGrid double: TRX round-trip (broadcast
+  signature recovers to the wallet TRON address), USDT trigger
+  withdrawal, signer-unavailable abort, dropped-holds, blacklist
+  refusal; indexing: TRX + TRC-20 deposits credited, replay-safe,
+  reorg reversal with reconciliation balanced.
+- NOT verified: live TronGrid/Nile interaction (egress), funded
+  Nile round-trip (the backlog exit criterion is met only against
+  the provider double), broadcast-JSON acceptance by a live node,
+  recovery-id convention against java-tron, energy/bandwidth
+  estimation & delegation, TRC-10. Signing gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,
