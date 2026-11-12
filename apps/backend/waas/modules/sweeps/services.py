@@ -178,6 +178,10 @@ def create_sweep(
     requested_by_type: str = "api",
     requested_by_id: str = "",
 ) -> Sweep:
+    from waas.modules.operations.models import PlatformHalt
+
+    if PlatformHalt.is_active():
+        raise SweepError("sweep creation refused: platform halt is active (kill switch)")
     project = wallet.project
     existing = Sweep.objects.filter(
         project=project, idempotency_key=idempotency_key
@@ -253,6 +257,15 @@ def process_sweep(
     once, here, before approval; after approval the snapshot is
     the only destination (§7)."""
     resolver_kwargs = resolver_kwargs or {}
+    from waas.modules.operations.models import PlatformHalt
+
+    if PlatformHalt.is_active() and sweep.status in (
+        Sweep.Status.CREATED, Sweep.Status.RESOLVED
+    ):
+        return _fail(
+            sweep, Sweep.Status.FAILED,
+            "platform halt activated before processing (kill switch)",
+        )
     if sweep.status == Sweep.Status.CREATED:
         sweep.status = Sweep.Status.RESOLVING
         sweep.save(update_fields=["status", "updated_at"])

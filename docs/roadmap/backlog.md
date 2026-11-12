@@ -337,7 +337,12 @@ Rules for the taxonomy:
 ---
 
 ## Phase 12 — Hardening and Production Preparation
-- **Status:** Planned
+- **Status:** Preparation scope implemented (2026-11-12) — see
+  `docs/architecture/phase-12-hardening.md`. Custodium remains
+  **NOT Production Approved**: the independent review, pentest,
+  legal review, live-chain soaks, and drills in the exit
+  criteria are still open, and the production approval decision
+  has not been made.
 - **Goal:** Prepare — not declare — production readiness. This phase
   produces evidence for a separate production approval decision.
 

@@ -37,6 +37,7 @@ from waas.modules.wallets.models import Wallet
 
 from . import dispatch
 from .models import (
+    PlatformHalt,
     ReconciliationHalt,
     WithdrawalApproval,
     WithdrawalPolicy,
@@ -90,6 +91,13 @@ def _halt_active(network: BlockchainNetwork) -> bool:
     return ReconciliationHalt.objects.filter(network=network, active=True).exists()
 
 
+def _assert_not_platform_halted(*, action: str) -> None:
+    """Phase 12 kill switch: the global PlatformHalt refuses
+    money movement platform-wide while active."""
+    if PlatformHalt.is_active():
+        raise OperationsError(f"{action} refused: platform halt is active (kill switch)")
+
+
 # ---------------------------------------------------------------- create
 
 
@@ -116,6 +124,7 @@ def create_withdrawal_request(
         raise OperationsError("asset does not belong to the network")
     if amount <= 0:
         raise OperationsError("amount must be positive")
+    _assert_not_platform_halted(action="withdrawal creation")
     if _halt_active(network):
         raise OperationsError(
             f"withdrawals on {network.slug} are halted pending reconciliation"
@@ -311,6 +320,7 @@ def dispatch_withdrawal(
     worker command for approved requests."""
     if request.status != WithdrawalRequest.Status.APPROVED:
         raise OperationsError(f"request is {request.status}, not approved")
+    _assert_not_platform_halted(action="withdrawal dispatch")
     if _halt_active(request.network):
         raise OperationsError("network is halted pending reconciliation")
     request.status = WithdrawalRequest.Status.SIGNING

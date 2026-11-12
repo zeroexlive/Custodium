@@ -16,6 +16,7 @@ from ninja.errors import HttpError
 from waas.api.authentication import AnyAuth, DashboardAuth
 from waas.api.context import has_any_scope, is_machine, resolve_project
 from waas.modules.assets.models import Asset
+from waas.modules.audit.models import AuditEvent
 from waas.modules.networks.models import BlockchainNetwork
 from waas.modules.organizations.models import Membership
 from waas.modules.projects.models import Project
@@ -298,3 +299,48 @@ def journal_export(request, project_id: str, days: int = 30):
         f'attachment; filename="journal-{project_id}.csv"'
     )
     return response
+
+
+# ------------------------------------------------------- operator controls
+operator_router = Router(tags=["operator"], auth=DashboardAuth())
+
+
+class HaltIn(Schema):
+    active: bool
+    reason: str = ""
+
+
+@operator_router.get("/operator/platform-halt", response={200: dict, 403: dict})
+def get_platform_halt(request):
+    if not getattr(request.actor, "is_staff", False):
+        raise HttpError(403, "platform halt is an operator control")
+    from waas.modules.operations.models import PlatformHalt
+
+    row = PlatformHalt.objects.filter(pk=1).first()
+    return {
+        "active": bool(row and row.active),
+        "reason": row.reason if row else "",
+        "updated_at": row.updated_at.isoformat() if row else None,
+    }
+
+
+@operator_router.post("/operator/platform-halt", response={200: dict, 403: dict})
+def set_platform_halt(request, payload: HaltIn):
+    """Phase 12 kill switch: staff-only, reason required to
+    activate, every change audited."""
+    if not getattr(request.actor, "is_staff", False):
+        raise HttpError(403, "platform halt is an operator control")
+    if payload.active and not payload.reason.strip():
+        raise HttpError(422, "a reason is required to activate the platform halt")
+    from waas.modules.operations.models import PlatformHalt
+
+    row, _ = PlatformHalt.objects.get_or_create(pk=1)
+    row.active = payload.active
+    row.reason = payload.reason.strip()[:500]
+    row.save(update_fields=["active", "reason", "updated_at"])
+    AuditEvent.record(
+        "operator.platform_halt_changed",
+        actor_user=request.actor,
+        metadata={"active": payload.active, "reason": row.reason},
+    )
+    return {"active": row.active, "reason": row.reason}
