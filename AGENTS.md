@@ -229,10 +229,35 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 - Phase 1 is committed locally as ONE commit (apps/, root files, CI,
   AGENTS.md update). Push/merge for BOTH phases awaits the same unblock:
   Muse GitHub App installation covering `zeroexlive/Custodium`.
-  When unblocked: Phase 0 snapshot push → PR → merge → verify remote,
-  then Phase 1 snapshot push (paths = Phase 1 commit file list) → PR →
-  merge → verify remote, then realign local branches with origin and
-  record the remote SHAs here.
+
+### 2026-11-12 — GitHub unblocked; Phase 0 PUSHED & MERGED to main
+- William set the Muse GitHub App installation to **all repositories**.
+  The earlier snapshot 403 is resolved.
+- Phase 0 push used the connector snapshot procedure (plain `git push`
+  has no credentials in this VM): 84 paths (the deleted placeholder
+  `.github/workflows/.gitkeep` was dropped from the manifest — it was
+  superseded by the real CI workflow in Phase 1). Remote branch commit:
+  `06173a53a0f6e3630bb220db3d7669a807d85ab6` on `wip-phase-0-phase-1`,
+  verified via `list_commits`. Sync record written to
+  `~/workspace/Custodium.muse-github-snapshot-sync.json` (outside repo).
+- PR **#1** created and merged to `main` (merge commit
+  `4e347749bcf5b645a8dbced332a27bec25627ae9`). Verified on remote `main`:
+  commit list [merge, Phase 0, initial] and `docs/prd/product-requirements.md`
+  readable. Phase 0 status: Implemented on GitHub `main`.
+- Phase 1 push follows immediately in the next entry (its snapshot
+  carries this record).
+- Phase 1 snapshot attempt (2026-11-12, twice): `push-files` failed at
+  git/trees with the same 403. Diagnosis: the only path class not
+  present in the successful Phase 0 push is `.github/workflows/ci.yml` —
+  GitHub requires the **Workflows** permission for an integration to
+  create workflow files, and the Muse app token apparently does not
+  carry it, so the whole tree is rejected. Everything else in the
+  manifest is ordinary content. Resolution chosen by William
+  (2026-11-12): push the Phase 1 snapshot without `ci.yml`
+  (160 paths), merge, and add `ci.yml` manually via the GitHub web UI
+  once (its full content is in the local repo). Outstanding after the
+  merge: William adds `.github/workflows/ci.yml` on GitHub; until then
+  the repo has no CI — do not claim CI is active.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,
