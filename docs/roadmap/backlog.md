@@ -240,7 +240,11 @@ Rules for the taxonomy:
 ---
 
 ## Phase 8 — TON
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/blockchains/ton-implementation.md` (live-network
+  verification and the testnet round-trip remain open, as
+  recorded there; construction differentially verified against
+  @ton/ton and tonsdk).
 - **Goal:** TON support: TON native asset and jettons.
 
 ### Tasks

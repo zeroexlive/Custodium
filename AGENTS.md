@@ -63,8 +63,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
 | 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
 | 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
-| 7 | Solana | Implemented 2026-11-12 — Ed25519 port, message compiler, ATA, balance-delta indexing; live-cluster verification NOT done (sandbox egress; see history) |
-| 8 | TON | Planned |
+| 7 | Solana | Implemented — merged to `main` 2026-11-12 (PR #8, merge `1dae8c9`); live-cluster verification NOT done (sandbox egress; see history) |
+| 8 | TON | Implemented 2026-11-12 — cells/BoC, wallet v4r2, jettons, per-account indexing; differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Planned |
 | 10 | Sweeping & Treasury | Planned |
 | 11 | SaaS Product Completion | Planned |
@@ -642,6 +642,48 @@ Full record: `docs/blockchains/solana-implementation.md`.
 - NOT verified: live cluster/devnet round-trip (egress; exit
   criterion met against the double only), Token-2022, priority
   fees, ATA acceptance by a live cluster. Signing gate unchanged.
+- Outcome: snapshot push (22 paths) → branch commit
+  `b05300dbe3d8236590301b4ac5aca2daaabe9cf6`; PR **#8** merged to
+  `main`, merge commit `1dae8c9b9b15c1db75324dcf5e83b51377c273df`,
+  verified via GitHub API (main = [P7 merge, P7, P6 merge, ...]).
+  Sync record appended (8 entries). Local branches realigned; this
+  note rides the Phase 8 commit. Next: Phase 8 (TON).
+
+### 2026-11-12 — Phase 8 COMPLETE (TON)
+Full record: `docs/blockchains/ton-implementation.md`.
+- **New module `waas/modules/ton/`** (`ton`, `ton-testnet`):
+  cells/BoC from scratch (builder/slice, repr hashing, CRC32C);
+  raw↔friendly addresses (CRC16, testnet-flag discipline,
+  masterchain destinations rejected); **wallet V4R2** (code cell
+  verbatim from the official @ton/ton SDK; StateInit derivation;
+  signed-transfer builder; seqno always from chain; per-wallet
+  send serialisation under the row lock; signer key checked
+  against the derived contract address); toncenter provider
+  (v2 + v3 transactionsByMessage confirmation; Jetton
+  `get_wallet_address` resolved once and cached); withdrawal
+  pipeline with platform semantics (Jetton sends attach 0.05 TON,
+  recorded); per-account **`lt`-cursor deposit scanner** (native
+  at the wallet; Jetton from `internal_transfer` payloads at the
+  Jetton wallet; notifications/excesses/bounces filtered by
+  design). Lookup + reconciliation cover TON withdrawals.
+- **Differential verification (this phase's highlight)**: the
+  @ton/ton spec's written address expectation proved STALE (the
+  upstream test is it.skip'd) — so the shipped **@ton/ton package
+  and tonsdk were both executed locally** (npm/PyPI egress
+  works): for the deterministic `v4-treasure` key, both derive
+  `EQDgICpEIOY6…`, exactly matching this module; and a reference
+  signed transfer's body cell hash `8e8c73a2…` was reproduced
+  byte-identically (signature included). A manual representation
+  hash independently confirmed the data cell.
+- VERIFIED (actually run): backend `pytest` **138 passed, 1
+  skipped**; ruff clean. Pipeline vs API double incl. broadcast
+  BoC signature verifying over the reconstructed signing-cell
+  hash; deposit filter matrix + replay safety.
+- NOT verified: live toncenter/testnet round-trip (chain APIs
+  unreachable from the sandbox; exit criterion met against the
+  double + differential proofs), Wallet V5, outbound-Jetton
+  bounce-completion tracking (Phase 12). Signing gate unchanged.
+  All five chains are now implemented; next is Phase 9.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

@@ -17,6 +17,10 @@ from waas.modules.solana.chains import SOLANA_NETWORK_SLUGS
 from waas.modules.solana.chains import resolve_chain as resolve_solana_chain
 from waas.modules.solana.indexing import scan_solana_once
 from waas.modules.solana.provider import SolanaProvider
+from waas.modules.ton.chains import TON_NETWORK_SLUGS
+from waas.modules.ton.chains import resolve_chain as resolve_ton_chain
+from waas.modules.ton.indexing import scan_ton_once
+from waas.modules.ton.provider import TonProvider
 from waas.modules.tron.chains import TRON_NETWORK_SLUGS
 from waas.modules.tron.chains import resolve_chain as resolve_tron_chain
 from waas.modules.tron.indexing import scan_tron_once
@@ -48,6 +52,7 @@ class Command(BaseCommand):
                     slug__in=EVM_SLUGS
                     + sorted(TRON_NETWORK_SLUGS)
                     + sorted(SOLANA_NETWORK_SLUGS)
+                    + sorted(TON_NETWORK_SLUGS)
                 )
             )
         while True:
@@ -65,6 +70,9 @@ class Command(BaseCommand):
                         network=network, provider=provider,
                         max_blocks=options["max_blocks"],
                     )
+                elif network.slug in TON_NETWORK_SLUGS:
+                    provider = TonProvider(resolve_ton_chain(network))
+                    report = scan_ton_once(network=network, provider=provider)
                 else:
                     provider = EvmProvider(resolve_chain(network))
                     report = services.scan_once(
