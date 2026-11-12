@@ -9,6 +9,7 @@ from waas.modules.assets.api.router import router as assets_router
 from waas.modules.audit.api.router import router as audit_router
 from waas.modules.blacklist.api.router import router as blacklist_router
 from waas.modules.identity.api.router import router as identity_router
+from waas.modules.indexing.api.router import router as indexing_router
 from waas.modules.ledger.api.router import router as ledger_router
 from waas.modules.networks.api.router import router as networks_router
 from waas.modules.organizations.api.router import router as organizations_router
@@ -31,6 +32,7 @@ api.add_router("", audit_router)
 api.add_router("", wallets_router)
 api.add_router("", ledger_router)
 api.add_router("", blacklist_router)
+api.add_router("", indexing_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but
@@ -40,15 +42,6 @@ api.add_router("", blacklist_router)
 phase_router = Router(tags=["phase-gates"])
 any_auth = AnyAuth()
 dashboard_auth = DashboardAuth()
-
-
-@phase_router.get("/transactions/lookup", auth=any_auth)
-def transaction_lookup_not_implemented(request, network: str, hash: str):
-    raise HttpError(
-        501,
-        "Transaction indexing and hash lookup are not available until Phase 5. "
-        "No result is returned rather than an unverified one.",
-    )
 
 
 @phase_router.get("/sweep-destination-endpoint", auth=dashboard_auth)

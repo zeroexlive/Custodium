@@ -10,19 +10,19 @@ import Badge from '@/components/ui/Badge.vue'
 const network = ref('ethereum'); const hash = ref('')
 const result = ref<TransactionLookup | null>(null)
 const error = ref<string | null>(null); const loading = ref(false)
-const networks = ['ethereum', 'bsc', 'tron', 'solana', 'ton']
+const networks = ['ethereum', 'ethereum-sepolia', 'bsc', 'bsc-testnet', 'tron', 'tron-nile', 'solana', 'solana-devnet', 'ton', 'ton-testnet']
 
 async function submit(): Promise<void> {
   error.value = null; result.value = null; loading.value = true
   try { result.value = await api.lookupTransaction(network.value, hash.value.trim()) }
-  catch (e) { error.value = e instanceof ApiError ? e.message : 'Lookup failed — the transaction indexer (Phase 5) may not be available yet.' }
+  catch (e) { error.value = e instanceof ApiError ? e.message : 'Lookup failed.' }
   finally { loading.value = false }
 }
 </script>
 <template>
   <div class="space-y-6">
     <h1 class="text-2xl font-semibold">Transaction Hash Explorer</h1>
-    <p class="text-ink-muted">Wired to <code class="font-mono text-sm">GET /api/v1/transactions/lookup</code> (indexer: Phase 5). Results only ever include addresses belonging to your tenant.</p>
+    <p class="text-ink-muted">Wired to <code class="font-mono text-sm">GET /api/v1/transactions/lookup</code>. Full detail is shown only for your own transactions; other transactions return the public on-chain minimum.</p>
     <Card title="Look up a transaction">
       <form class="space-y-4" @submit.prevent="submit">
         <div class="space-y-1">

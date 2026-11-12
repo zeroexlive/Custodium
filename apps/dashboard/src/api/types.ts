@@ -18,11 +18,21 @@ export interface Asset {
 }
 export interface AuthResponse { access_token?: string; token?: string; user?: User }
 export interface MatchedAddress { address_id: string; wallet_id: string; external_customer_id?: string | null; role: string }
-export interface Transfer { transfer_id: string; asset_id: string; direction: 'incoming' | 'outgoing'; amount_base_units: string; decimals: number }
+export interface Transfer { transfer_id: string; direction: 'in' | 'out'; amount_base_units: string; decimals: number; asset?: string; from?: string; to?: string }
 export interface TransactionLookup {
   network: string; transaction_hash: string; status: string; indexed: boolean;
   belongs_to_tenant: boolean; block_or_slot?: string | number | null; timestamp?: string | null;
   confirmations?: number | null; matched_addresses: MatchedAddress[]; transfers: Transfer[];
+  tenant_record?: { type: string; transaction_id: string; wallet_id: string; external_customer_id?: string | null; status: string; held: boolean };
+}
+/** Deposits observed by the Phase 5 indexer for one wallet. Amounts are
+ *  integer base-unit strings. `held` deposits (blacklisted sender) stay
+ *  pending for manual review and are never auto-credited. */
+export interface DepositRecord {
+  id: string; network: string; tx_hash: string; asset: string;
+  contract_or_mint_address: string | null; amount: string;
+  from_address: string; to_address: string; status: 'pending' | 'credited' | 'reorged_out';
+  held: boolean; block_number: number; confirmations: number | null; confirmations_required: number;
 }
 export interface SweepDestinationEndpoint { endpoint_url: string; status?: string; updated_at?: string }
 export interface Paginated<T> { items: T[]; total?: number }

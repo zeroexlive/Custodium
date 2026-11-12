@@ -1,7 +1,7 @@
 import type {
   ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, Network, Organization, Project,
-  ProjectBalances, SweepDestinationEndpoint, TransactionLookup, User, Wallet,
+  ProjectBalances, SweepDestinationEndpoint, TransactionLookup, DepositRecord, User, Wallet,
   WalletAddress, WalletBalances,
 } from './types'
 
@@ -83,6 +83,8 @@ export const api = {
   // Transaction hash explorer
   lookupTransaction: (network: string, hash: string) =>
     request<TransactionLookup>('GET', `/transactions/lookup?network=${encodeURIComponent(network)}&hash=${encodeURIComponent(hash)}`),
+  listWalletDeposits: (walletId: string, projectId: string) =>
+    request<{ deposits: DepositRecord[] }>('GET', `/wallets/${encodeURIComponent(walletId)}/deposits?project_id=${encodeURIComponent(projectId)}`),
 
   // Wallets (Phase 2 records; MPC key generation itself is Phase 3)
   listWallets: async (filters: { project_id: string; external_customer_id?: string; status?: string }): Promise<Wallet[]> => {
