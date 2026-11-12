@@ -67,8 +67,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 8 | TON | Implemented — merged to `main` 2026-11-12 (PR #9, merge `7800470`); differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented — merged to `main` 2026-11-12 (PR #10, merge `4eacf6a`); live-testnet soak NOT done (egress; see history) |
 | 10 | Sweeping & Treasury | Implemented — merged to `main` 2026-11-12 (PR #11, merge `0a7b7fb`); live tenant-endpoint interop NOT verified (egress; see history) |
-| 11 | SaaS Product Completion | Implemented 2026-11-12 — webhooks (signed, retry ladder, replay), plans/quotas/metering/invoicing, team mgmt, audit export, support lookup, integration docs + test vectors |
-| 12 | Hardening & Production Preparation | Planned |
+| 11 | SaaS Product Completion | Implemented — merged to `main` 2026-11-12 (PR #12, merge `824ddd7`); live webhook delivery NOT verified (egress; see history) |
+| 12 | Hardening & Production Preparation | Preparation scope implemented 2026-11-12 — DB append-only triggers, platform kill switch, probes, runbooks, readiness assessment. **Custodium is NOT Production Approved** (independent review/pentest/legal/soaks open; see history) |
 
 ## Environment notes (this dev VM, 2026-11-12)
 
@@ -827,6 +827,53 @@ Full record: `docs/architecture/phase-11-saas.md`.
   collection (intentionally off-platform), deployed
   fresh-tenant walkthrough, PostgreSQL, CI, Temporal. Signing
   gate unchanged.
+- Outcome: first snapshot-push attempt's approval EXPIRED
+  unapproved (nothing pushed); retry after William's "Push it"
+  landed as branch commit
+  `ea719c2cc9e8fc4fae75a9a3976a890d424f9d5b`; PR **#12** merged
+  to `main`, merge commit `824ddd73cd57710377b23a20b07a8118360e2635`,
+  verified via GitHub API (main = [P11 merge, P11, P10 merge,
+  ...]). Sync record appended (12 entries). Local branches
+  realigned; this note rides the Phase 12 commit. Next: Phase
+  12 (Hardening & Production Preparation) — the final phase.
+
+### 2026-11-12 — Phase 12 COMPLETE (preparation scope) — roadmap finished
+Full record + readiness assessment:
+`docs/architecture/phase-12-hardening.md`. **Custodium is NOT
+Production Approved** — the phase's own exit criteria require
+an independent review with no open critical/high findings and
+a separate written approval decision; neither exists.
+- Built: **DB-level append-only triggers** (migration
+  ledger.0003, `waas/common/db_triggers.py`) forbidding
+  UPDATE/DELETE on ledger_journal_entry, ledger_journal_line,
+  audit_audit_event, sweeps_resolveddestinationsnapshot —
+  PostgreSQL function+triggers / SQLite RAISE(ABORT); tests
+  prove raw SQL cannot rewrite history while appends work and
+  the whole suite passes with triggers live. **Platform kill
+  switch** (`PlatformHalt` + staff-only audited operator API;
+  refuses withdrawal/sweep creation, dispatch, sweep
+  processing). **/healthz + /readyz** probes. **Runbooks**:
+  incident-response (7 scenarios, all steps use shipped
+  mechanisms), key-ceremony (procedures + drill cadence,
+  gated on the review), mainnet-rollout-plan (preconditions,
+  staged caps, rollback).
+- VERIFIED (actually run): backend `pytest` **167 passed, 1
+  skipped**; ruff clean; **cargo test --workspace 16 passed**
+  (re-run for the final record); frontend typecheck + vitest
+  (9) + build green; migrations apply cleanly from scratch
+  (SQLite). A UUID storage-format bug in the trigger test
+  (dashed vs hex params matching zero rows) was found and
+  fixed during verification.
+- NOT verified / still open (external, by design): independent
+  cryptographic + security reviews (package ready, William to
+  commission), pentest, legal review, live-chain testnet soaks
+  (egress), PostgreSQL trigger smoke test on a live server,
+  Temporal (never wired), DR drills on real infrastructure,
+  CI results (not visible via connector). Production signing
+  remains DISABLED; wallets remain `provisioning`. This closes
+  the 13-phase roadmap: all phases 0–12 are implemented and
+  merged to `main`; what remains is evidence and approvals,
+  not features.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

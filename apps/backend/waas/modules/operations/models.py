@@ -171,3 +171,21 @@ class ReconciliationHalt(models.Model):
     raised_at = models.DateTimeField(null=True, blank=True)
     cleared_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class PlatformHalt(models.Model):
+    """Phase 12 kill switch: a single global row. While active,
+    withdrawal/sweep creation and dispatch refuse platform-wide
+    (in addition to per-network ReconciliationHalts). Toggled
+    only by staff operators, always with a reason, always
+    audited."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1)
+    active = models.BooleanField(default=False)
+    reason = models.CharField(max_length=500, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def is_active(cls) -> bool:
+        row = cls.objects.filter(pk=1).first()
+        return bool(row and row.active)

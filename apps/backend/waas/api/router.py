@@ -12,6 +12,7 @@ from waas.modules.indexing.api.router import router as indexing_router
 from waas.modules.ledger.api.router import router as ledger_router
 from waas.modules.networks.api.router import router as networks_router
 from waas.modules.operations.api.router import dashboard_router as operations_dashboard_router
+from waas.modules.operations.api.router import operator_router
 from waas.modules.operations.api.router import router as operations_router
 from waas.modules.organizations.api.router import router as organizations_router
 from waas.modules.plans.api.router import router as plans_router
@@ -41,6 +42,7 @@ api.add_router("", blacklist_router)
 api.add_router("", indexing_router)
 api.add_router("", operations_router)
 api.add_router("", operations_dashboard_router)
+api.add_router("", operator_router)
 api.add_router("", sweeps_router)
 api.add_router("", sweeps_dashboard_router)
 api.add_router("", webhooks_router)
