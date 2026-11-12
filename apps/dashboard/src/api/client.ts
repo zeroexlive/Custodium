@@ -1,6 +1,7 @@
 import type {
   ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, Network, Organization, Project,
+  GasStation, GasTopUp,
   ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
   Invoice, OrgMember, Plan, UsageSnapshot, WalletAddress, WalletBalances,
   WebhookDelivery, WebhookEndpoint, WebhookEndpointCreated, WithdrawalPolicy, WithdrawalRequest,
@@ -170,6 +171,16 @@ export const api = {
     request<Sweep>('POST', '/sweeps', payload, { 'Idempotency-Key': idempotencyKey }),
   approveSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/approve`, { note: '' }),
   rejectSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/reject`, { note: '' }),
+
+  // Gas station — per-(project, network) top-up configuration.
+  listGasStations: async (projectId: string) =>
+    listOf(await request<GasStation[] | { items: GasStation[] }>('GET', `/gas-stations?project_id=${encodeURIComponent(projectId)}`)),
+  putGasStation: (payload: {
+    project_id: string; network: string; funding_wallet_id: string;
+    min_native_balance: string; topup_amount: string; max_topups_per_day: number; enabled: boolean;
+  }) => request<GasStation>('PUT', '/gas-stations', payload),
+  listGasTopups: async (projectId: string) =>
+    listOf(await request<GasTopUp[] | { items: GasTopUp[] }>('GET', `/gas-stations/topups?project_id=${encodeURIComponent(projectId)}`)),
 
   // Webhooks (Phase 11)
   listWebhookEndpoints: async (projectId: string) =>

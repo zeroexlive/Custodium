@@ -42,6 +42,10 @@ console — behind HMAC-authenticated REST APIs.
 - **Sweeps that can't be redirected** — destinations come only from a
   tenant-registered HTTPS resolver endpoint (SSRF-hardened), are snapshotted
   immutably before approval, and are never accepted in a sweep request.
+- **Gas station** — per-project, per-network automatic native-coin
+  top-ups: when a wallet's on-chain native balance falls below a
+  configured threshold, a funding wallet tops it up through the normal
+  transfer pipeline and the pending withdrawal or sweep proceeds.
 - **Production-shaped operations** — signed webhooks with retries and
   replay, plans/quotas/billing, audit exports, a platform kill switch,
   health/readiness probes, and incident-response runbooks.

@@ -16,6 +16,7 @@ from django.db import transaction
 from waas.modules.assets.models import Asset
 from waas.modules.audit.models import AuditEvent
 from waas.modules.blacklist import services as blacklist_services
+from waas.modules.gasstation.services import GasTopUpPending
 from waas.modules.ledger import services as ledger_services
 from waas.modules.ledger.models import AccountType
 from waas.modules.networks.models import BlockchainNetwork
@@ -391,6 +392,14 @@ def _execute_sweep(
             idempotency_key=f"swp:{sweep.id}",
             factories=factories,
         )
+    except GasTopUpPending as exc:
+        # Not a failure: a gas top-up is in flight. Return to
+        # RESOLVED (snapshot untouched; no re-resolution) and let
+        # the next worker pass execute once gas has landed.
+        sweep.status = Sweep.Status.RESOLVED
+        sweep.status_reason = f"awaiting gas: {exc.reason}"[:500]
+        sweep.save(update_fields=["status", "status_reason", "updated_at"])
+        return sweep
     except Exception as exc:
         return _fail(sweep, Sweep.Status.FAILED, f"dispatch error: {exc}")
     family = dispatch.family_of(sweep.network)

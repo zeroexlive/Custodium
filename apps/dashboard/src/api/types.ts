@@ -50,6 +50,17 @@ export interface Sweep {
   approvals_received: number; chain_tx_hash: string;
   external_reference: string; created_at: string;
 }
+/** Gas station: per-(project, network) native-coin top-up config. */
+export interface GasStation {
+  id: string; project_id: string; network: string; funding_wallet_id: string;
+  enabled: boolean; min_native_balance: string; topup_amount: string;
+  max_topups_per_day: number;
+}
+export interface GasTopUp {
+  id: string; network: string; target_wallet_id: string; amount: string;
+  status: string; operation_key: string; chain_tx_hash: string;
+  failure_reason: string; created_at: string;
+}
 export interface Paginated<T> { items: T[]; total?: number }
 
 /** Wallets (Phase 2). A wallet stays `provisioning` until MPC key generation
