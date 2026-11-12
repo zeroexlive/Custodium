@@ -216,3 +216,38 @@ class EvmProvider:
         A mined receipt with status 0x0 means the transaction
         reverted on-chain."""
         return self._call("eth_getTransactionReceipt", [tx_hash])  # type: ignore[return-value]
+
+    # -- indexing reads (Phase 5) --------------------------------------
+    def get_block(self, number: int) -> dict | None:
+        """A block with full transaction objects, or None if the
+        height does not exist (yet / anymore after a reorg)."""
+        return self._call("eth_getBlockByNumber", [hex(number), True])  # type: ignore[return-value]
+
+    def get_block_hash(self, number: int) -> str | None:
+        block = self._call("eth_getBlockByNumber", [hex(number), False])
+        return None if block is None else str(block["hash"])
+
+    def get_logs(
+        self,
+        *,
+        addresses: list[str],
+        topics: list[str | None],
+        from_block: int,
+        to_block: int,
+    ) -> list[dict]:
+        """eth_getLogs for the given contract addresses and topic
+        filter (None = wildcard position)."""
+        if not addresses:
+            return []
+        result = self._call(
+            "eth_getLogs",
+            [
+                {
+                    "address": [keys.normalize_address(a) for a in addresses],
+                    "topics": topics,
+                    "fromBlock": hex(from_block),
+                    "toBlock": hex(to_block),
+                }
+            ],
+        )
+        return list(result)  # type: ignore[arg-type]

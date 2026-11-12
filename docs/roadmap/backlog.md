@@ -173,7 +173,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 5 — Indexing and Balance Lookup
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/architecture/phase-5-indexing.md` (live-chain scanning and
+  the Temporal reconciliation workflow remain open, as recorded
+  there).
 - **Goal:** Reliable deposit detection and balance lookup for the
   chains enabled so far.
 

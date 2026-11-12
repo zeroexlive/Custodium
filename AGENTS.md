@@ -60,8 +60,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
 | 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
 | 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
-| 4 | Ethereum & BSC | Implemented 2026-11-12 — EVM module + withdrawal pipeline + MPC cross-proof; live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
-| 5 | Blockchain Indexing & Lookup | Planned |
+| 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
+| 5 | Blockchain Indexing & Lookup | Implemented 2026-11-12 — EVM scanner, deposit lifecycle, reorg reversal, lookup API live; live-chain scanning NOT verified (sandbox egress; see history) |
 | 6 | TRON | Planned |
 | 7 | Solana | Planned |
 | 8 | TON | Planned |
@@ -491,6 +491,71 @@ Full record: `docs/blockchains/evm-implementation.md`.
   replace-by-fee automation. The backlog's Phase 4 exit criterion
   is met except the on-chain round-trip, recorded as such in the
   implementation doc §6–7. No mainnet enablement.
+- Outcome: first two snapshot-push attempts expired unapproved
+  (30-min approval cards, 2026-11-12 afternoon); on William's
+  retry the push succeeded → branch commit
+  `faacd162f39c6bc9c54255a6f11618d9c79e9c08`; PR **#5** merged to
+  `main`, merge commit `5b041971a1d6dbd22dcc6ba41fa57c9ece2f78f4`,
+  verified via GitHub API (main = [P4 merge, P4, P3 merge, ...]).
+  Sync record appended (5 entries). Local branches realigned; this
+  note rides the Phase 5 commit. Next: Phase 5 (Indexing & Lookup).
+
+### 2026-11-12 — Phase 5 COMPLETE (Indexing & Balance Lookup)
+Full record: `docs/architecture/phase-5-indexing.md`.
+- **New module `waas/modules/indexing/`**: `ChainCursor` +
+  `ScannedBlock` (512-block hash window) + `ObservedDeposit`
+  (uniqueness incl. block hash). Scanner (`services.scan_once`,
+  one DB transaction per pass): reorg walk-back FIRST (orphaned
+  blocks' deposits un-credited via ledger **reversals**, never
+  edits), then block scan — native transfers receipt-verified,
+  ERC-20/BEP-20 via Transfer logs through new EVM provider methods
+  (`get_block`, `get_block_hash`, `get_logs`) — then confirmation
+  pass. Lifecycle: DEPOSIT_OBSERVED at detection (custody_pending/
+  customer_pending), one balanced 4-line DEPOSIT_CREDIT at the
+  network's `confirmations_required`; scope = Phase 4 wallet
+  scope. Blacklisted-sender deposits are **held** in pending for
+  manual review, never auto-credited. Exactly-once = deposit
+  uniqueness + deterministic ledger idempotency keys + status
+  flips in-transaction (full-replay test proves it).
+- **Worker**: `manage.py run_indexer` (separate from web;
+  --network/--max-blocks/--until-caught-up; per-pass report incl.
+  lag + reorg depth). Reconciliation report: expected custody
+  (deposits − settled withdrawals) vs ledger custody per asset.
+- **Lookup API replaces the Phase 1 501 gate** per the Phase 0
+  normative design (`docs/api/transaction-lookup.md`): 422
+  unknown network / malformed hash; tenant projection (full
+  detail + tenant_record) for own transactions; **public
+  projection** for other tenants' indexed transactions (raw
+  on-chain data only, belongs_to_tenant=false — not an existence
+  oracle); 404 unindexed; audit event per lookup; RPC fallback
+  policy-gated OFF. Also `GET /wallets/{id}/deposits`
+  (tenant-scoped). Dashboard: explorer view now works against the
+  real endpoint (network list corrected to registry slugs; the
+  Phase 1 `Transfer` type aligned to the implemented contract);
+  client gains `listWalletDeposits` + `DepositRecord` type.
+- **During the build I caught my own API bug**: `has_any_scope`
+  is variadic, not list-taking — fixed in the indexing router
+  before it shipped (machine-scope checks would have thrown).
+- VERIFIED (actually run): backend `pytest` **96 passed, 1
+  skipped** (known PostgreSQL wei case); ruff clean; frontend
+  typecheck clean, vitest 9 passed, build OK. Indexing scenarios
+  vs an in-memory forkable chain double: lifecycle balances per
+  stage, token deposit, reverted tx ignored, full replay
+  exactly-once, reorg before credit AND after credit (all
+  balances return to zero, trial balance 0), blacklist hold,
+  reconciliation balanced, lookup matrix + deposit-list tenant
+  isolation. Phase 1 gate test updated deliberately (lookup 501 →
+  real 422; sweep gate still 501). `run_indexer` command loads
+  and executes its query path (dev DB here has no tables — the
+  sandbox dev database was never migrated; noted, not a code
+  defect).
+- NOT verified: live-chain scanning (same sandbox egress block as
+  Phase 4; scanner proven against the provider-surface double);
+  Temporal reconciliation workflow (lifecycle is a synchronous
+  service, same step boundaries); lag alerting wiring (Phase 12);
+  on-chain balance cross-check endpoint (awaits RPC access);
+  non-EVM scanners (land with Phases 6–8). No mainnet enablement;
+  signing gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

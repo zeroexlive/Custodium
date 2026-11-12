@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     "waas.modules.ledger",
     "waas.modules.blacklist",
     "waas.modules.evm",
+    "waas.modules.indexing",
 ]
 
 MIDDLEWARE = [
