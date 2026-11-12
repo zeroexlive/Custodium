@@ -1,0 +1,160 @@
+syntax = "proto3";
+
+package custodium.mpc.v1;
+
+// Custodium MPC service contracts — Phase 0 / skeleton.
+//
+// SECURITY INVARIANTS for this API:
+// - No message in this file has, or may ever gain, a field that returns
+//   a private key or a private key share. Shares are referenced only by
+//   opaque `share_handle_id` strings and never leave a signer's domain.
+// - Signing is bound to a fully specified SigningIntent. Signers must
+//   independently evaluate policy against that intent; a coordinator
+//   request is not, by itself, authorisation to sign.
+// - All services fail closed: unimplemented operations return
+//   UNIMPLEMENTED / FAILED_PRECONDITION, never a fallback signature.
+
+option go_package = "custodium/mpc/v1;mpcv1";
+
+// The approved transaction intent every signing session is bound to.
+// Amounts are integer base units as decimal strings — never floats.
+message SigningIntent {
+  string tenant_id = 1;
+  string wallet_id = 2;
+  // e.g. "ethereum", "bsc", "tron", "solana", "ton" (+ environment).
+  string network = 3;
+  // Chain-specific asset identity (network + contract/mint/master +
+  // program where relevant) — never a bare symbol.
+  string asset_id = 4;
+  string destination = 5;
+  string amount_base_units = 6;
+  string fee_max_base_units = 7;
+  // Hash of the exact transaction payload to be signed.
+  string payload_hash = 8;
+  string policy_version = 9;
+  // Unix seconds. Intents at or past this time must be rejected.
+  int64 expires_at = 10;
+}
+
+enum SessionState {
+  SESSION_STATE_UNSPECIFIED = 0;
+  SESSION_STATE_CREATED = 1;
+  SESSION_STATE_RUNNING = 2;
+  SESSION_STATE_COMPLETED = 3;
+  SESSION_STATE_FAILED = 4;
+}
+
+enum RuntimeMode {
+  RUNTIME_MODE_UNSPECIFIED = 0;
+  RUNTIME_MODE_DEVELOPMENT = 1;
+  RUNTIME_MODE_TEST = 2;
+  // Production sessions are refused while production signing is
+  // disabled (see services/mpc/README.md).
+  RUNTIME_MODE_PRODUCTION = 3;
+}
+
+message CreateKeygenSessionRequest {
+  string wallet_id = 1;
+  // "ecdsa_secp256k1" or "ed25519".
+  string scheme = 2;
+  uint32 threshold = 3;           // initial topology target: 2
+  uint32 total_participants = 4;  // initial topology target: 3
+  RuntimeMode mode = 5;
+}
+
+message CreateKeygenSessionResponse {
+  string session_id = 1;
+  SessionState state = 2;
+}
+
+message CreateSigningSessionRequest {
+  SigningIntent intent = 1;
+  RuntimeMode mode = 2;
+}
+
+message CreateSigningSessionResponse {
+  string session_id = 1;
+  SessionState state = 2;
+}
+
+message GetSessionStatusRequest {
+  string session_id = 1;
+}
+
+message GetSessionStatusResponse {
+  string session_id = 1;
+  SessionState state = 2;
+  // Public result data only (e.g. a produced signature, encoded for
+  // the target network). Never key or share material.
+  bytes signature = 3;
+  string failure_reason = 4;
+}
+
+message ParticipateKeygenRequest {
+  string session_id = 1;
+  string signer_id = 2;
+  RuntimeMode mode = 3;
+}
+
+message ParticipateKeygenResponse {
+  string session_id = 1;
+  SessionState state = 2;
+  // Opaque handle of the share this signer now custodies in its own
+  // domain. The share itself is never transmitted.
+  string share_handle_id = 3;
+  // Public key material only.
+  string public_key = 4;
+}
+
+message ParticipateSigningRequest {
+  string session_id = 1;
+  string signer_id = 2;
+  SigningIntent intent = 3;
+  RuntimeMode mode = 4;
+  // Handle of the share to use, resolved inside the signer's domain.
+  string share_handle_id = 5;
+}
+
+message ParticipateSigningResponse {
+  string session_id = 1;
+  SessionState state = 2;
+  // This signer's signature contribution / final signature share of
+  // the protocol output, as defined by the reviewed protocol. This is
+  // signature data, never key material.
+  bytes signature_share = 3;
+  string failure_reason = 4;
+}
+
+message GetSignerHealthRequest {
+  string signer_id = 1;
+}
+
+message GetSignerHealthResponse {
+  string signer_id = 1;
+  bool healthy = 2;
+  // Whether production signing is enabled on this signer. Must be
+  // false until the review gates in services/mpc/README.md pass.
+  bool production_signing_enabled = 3;
+  string detail = 4;
+}
+
+// Orchestrates keygen and signing sessions across the independent
+// signers. The coordinator holds no key share and cannot sign alone.
+service Coordinator {
+  rpc CreateKeygenSession(CreateKeygenSessionRequest)
+      returns (CreateKeygenSessionResponse);
+  rpc CreateSigningSession(CreateSigningSessionRequest)
+      returns (CreateSigningSessionResponse);
+  rpc GetSessionStatus(GetSessionStatusRequest)
+      returns (GetSessionStatusResponse);
+}
+
+// One independent signer participant, in its own security domain.
+service Signer {
+  rpc ParticipateKeygen(ParticipateKeygenRequest)
+      returns (ParticipateKeygenResponse);
+  rpc ParticipateSigning(ParticipateSigningRequest)
+      returns (ParticipateSigningResponse);
+  rpc GetSignerHealth(GetSignerHealthRequest)
+      returns (GetSignerHealthResponse);
+}

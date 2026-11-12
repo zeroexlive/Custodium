@@ -1,0 +1,41 @@
+# Custodium MPC workspace — Phase 0 / skeleton only.
+# No threshold signing is implemented. See README.md.
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+rust-version = "1.74"
+
+[workspace.dependencies]
+# Internal crates (path only).
+custodium-mpc-shared = { path = "crates/shared" }
+
+# --- External threshold-cryptography candidates: NOT ENABLED ---
+# The following are deliberately commented out. Do not uncomment, pin, or
+# vendor them until the protocol evaluation, licence/audit review, and an
+# independent cryptographic review are complete.
+#
+# cggmp21 = "=PINNED VERSION + INDEPENDENT REVIEW REQUIRED BEFORE ENABLEMENT"
+#   # Candidate: threshold ECDSA (CGGMP family) for secp256k1.
+# frost-ed25519 = "=PINNED VERSION + INDEPENDENT REVIEW REQUIRED BEFORE ENABLEMENT"
+#   # Candidate: FROST (RFC 9591) for Ed25519 (Solana / TON).
+# tonic / prost (gRPC stack) are likewise deferred until the proto codegen
+# approach is reviewed; the .proto contract lives in ../../packages/proto.
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+dead_code = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+
+[profile.release]
+panic = "abort"
