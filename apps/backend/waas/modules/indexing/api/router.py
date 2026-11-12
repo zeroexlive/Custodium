@@ -40,6 +40,7 @@ from waas.modules.networks.models import BlockchainNetwork
 from waas.modules.organizations.models import Membership
 from waas.modules.projects.models import Project
 from waas.modules.solana.models import SolanaTransaction
+from waas.modules.ton.models import TonTransaction
 from waas.modules.tron.models import TronTransaction
 from waas.modules.wallets.models import Wallet
 
@@ -70,7 +71,13 @@ def _caller_projects(request, project_id: str | None) -> list[Project]:
 
 def _block_value(withdrawal) -> int | None:
     value = getattr(withdrawal, 'block_number', None)
-    return value if value is not None else getattr(withdrawal, 'slot', None)
+    if value is None:
+        value = getattr(withdrawal, 'slot', None)
+    return value if value is not None else getattr(withdrawal, 'mc_block_seqno', None)
+
+
+def _from_of(withdrawal) -> str:
+    return getattr(withdrawal, 'from_address', None) or getattr(withdrawal, 'from_raw', '')
 
 
 def _confirmations(network: BlockchainNetwork, block_number: int | None) -> int | None:
@@ -133,6 +140,15 @@ def _public_projection(network: BlockchainNetwork, tx_hash: str) -> dict | None:
             .select_related("asset")
             .first()
         )
+    if withdrawal is None:
+        from django.db.models import Q
+
+        withdrawal = (
+            TonTransaction.objects.filter(network=network)
+            .filter(Q(tx_hash=tx_hash) | Q(external_message_hash=tx_hash))
+            .select_related("asset")
+            .first()
+        )
     if withdrawal is not None:
         return {
             "network": network.slug,
@@ -150,7 +166,7 @@ def _public_projection(network: BlockchainNetwork, tx_hash: str) -> dict | None:
                     "direction": "out",
                     "amount_base_units": str(int(withdrawal.amount)),
                     "decimals": withdrawal.asset.decimals,
-                    "from": withdrawal.from_address,
+                    "from": _from_of(withdrawal),
                     "to": withdrawal.to_address,
                     "asset": withdrawal.asset.symbol,
                 }
@@ -232,6 +248,15 @@ def _tenant_projection(
             .select_related("asset", "wallet")
             .first()
         )
+    if withdrawal is None:
+        from django.db.models import Q
+
+        withdrawal = (
+            TonTransaction.objects.filter(network=network, wallet__project__in=projects)
+            .filter(Q(tx_hash=tx_hash) | Q(external_message_hash=tx_hash))
+            .select_related("asset", "wallet")
+            .first()
+        )
     if withdrawal is not None:
         wallet = withdrawal.wallet
         return {
@@ -257,7 +282,7 @@ def _tenant_projection(
                     "direction": "out",
                     "amount_base_units": str(int(withdrawal.amount)),
                     "decimals": withdrawal.asset.decimals,
-                    "from": withdrawal.from_address,
+                    "from": _from_of(withdrawal),
                     "to": withdrawal.to_address,
                     "asset": withdrawal.asset.symbol,
                 }

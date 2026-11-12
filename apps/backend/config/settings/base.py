@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "waas.modules.indexing",
     "waas.modules.tron",
     "waas.modules.solana",
+    "waas.modules.ton",
 ]
 
 MIDDLEWARE = [
@@ -133,3 +134,7 @@ TRON_API_KEY = ""
 
 # Solana RPC endpoints per network slug.
 SOLANA_RPC_ENDPOINTS: dict[str, list[str]] = {}
+
+# TON (toncenter) endpoints per network slug + optional API key.
+TON_API_ENDPOINTS: dict[str, list[str]] = {}
+TON_API_KEY = ""

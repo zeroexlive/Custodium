@@ -415,6 +415,7 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
     from waas.modules.evm.models import EvmTransaction
     from waas.modules.ledger.models import LedgerAccount
     from waas.modules.solana.models import SolanaTransaction
+    from waas.modules.ton.models import TonTransaction
     from waas.modules.tron.models import TronTransaction
 
     deposit_totals = {
@@ -425,7 +426,7 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
         .annotate(total=Sum("amount"))
     }
     withdrawal_totals: dict = {}
-    for model in (EvmTransaction, TronTransaction, SolanaTransaction):
+    for model in (EvmTransaction, TronTransaction, SolanaTransaction, TonTransaction):
         for row in (
             model.objects.filter(network=network, status=model.Status.CONFIRMED)
             .values("asset")
