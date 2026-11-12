@@ -122,6 +122,21 @@ def _post_credit(deposit: ObservedDeposit) -> None:
     deposit.credit_entry = entry
     deposit.status = ObservedDeposit.Status.CREDITED
     deposit.save(update_fields=["credit_entry", "status", "updated_at"])
+    from waas.modules.webhooks import services as webhook_services
+
+    webhook_services.emit_event(
+        project=project,
+        event_type="deposit.credited",
+        data={
+            "deposit_id": str(deposit.id),
+            "wallet_id": str(wallet.id),
+            "network": deposit.network.slug,
+            "asset": asset.symbol,
+            "amount": str(amount),
+            "tx_hash": deposit.tx_hash,
+            "to_address": deposit.address,
+        },
+    )
 
 
 def _reverse_deposit(deposit: ObservedDeposit) -> None:

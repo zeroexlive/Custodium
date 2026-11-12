@@ -66,8 +66,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 7 | Solana | Implemented — merged to `main` 2026-11-12 (PR #8, merge `1dae8c9`); live-cluster verification NOT done (sandbox egress; see history) |
 | 8 | TON | Implemented — merged to `main` 2026-11-12 (PR #9, merge `7800470`); differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented — merged to `main` 2026-11-12 (PR #10, merge `4eacf6a`); live-testnet soak NOT done (egress; see history) |
-| 10 | Sweeping & Treasury | Implemented 2026-11-12 — resolver-endpoint rule enforced end to end (SSRF defences, immutable snapshots, 422 destination rejection); live tenant-endpoint interop NOT verified (egress; see history) |
-| 11 | SaaS Product Completion | Planned |
+| 10 | Sweeping & Treasury | Implemented — merged to `main` 2026-11-12 (PR #11, merge `0a7b7fb`); live tenant-endpoint interop NOT verified (egress; see history) |
+| 11 | SaaS Product Completion | Implemented 2026-11-12 — webhooks (signed, retry ladder, replay), plans/quotas/metering/invoicing, team mgmt, audit export, support lookup, integration docs + test vectors |
 | 12 | Hardening & Production Preparation | Planned |
 
 ## Environment notes (this dev VM, 2026-11-12)
@@ -781,6 +781,52 @@ Full record: `docs/architecture/phase-10-sweeps.md`.
   public-internet egress), socket-level DNS pinning (documented
   as deployment layer), Temporal wiring, PostgreSQL, CI.
   Signing gate unchanged.
+- Outcome: snapshot push (24 paths) landed as branch commit
+  `8ae350145fe56ae34a0af21f07b0f94eba0035e3`; PR **#11** merged
+  to `main`, merge commit `0a7b7fbcd6873c88c44e188e4ec61d3635fd3833`,
+  verified via GitHub API (main = [P10 merge, P10, P9 merge,
+  ...]). Sync record appended (11 entries). Local branches
+  realigned; this note rides the Phase 11 commit. Next: Phase
+  11 (SaaS Product Completion).
+
+### 2026-11-12 — Phase 11 COMPLETE (SaaS Product Completion)
+Full record: `docs/architecture/phase-11-saas.md`.
+- **Webhooks** (`waas/modules/webhooks/`): project endpoints
+  (SSRF-validated at registration AND at every delivery,
+  `whsec_` secrets shown once, Fernet at rest, separate from API
+  HMAC); events deposit.credited / withdrawal.completed /
+  withdrawal.failed / sweep.completed / sweep.failed emitted
+  from the real lifecycle points (indexing credit path,
+  operations terminal transitions incl. dispatch-failure paths,
+  sweeps terminal transitions) inside the state-change
+  transaction; delivery per docs/api/webhooks.md
+  (`WaaS-Signature: t=,v1=` HMAC), at-least-once, 6-attempt
+  ladder → dead, `deliver_webhooks` worker, list + replay API,
+  dashboard Webhooks view.
+- **Plans/billing** (`waas/modules/plans/`): Plan catalog
+  (`seed_plans`: Sandbox/Growth/Scale), derived metering from
+  operational tables (no driftable store), quota enforcement at
+  wallet + API-key creation, fiat-only idempotent invoicing
+  (plan price + withdrawal overage; `generate_invoices`
+  command; mark-paid records off-platform payment — no card
+  data in system). Dashboard Billing view.
+- **Console completion**: team management endpoints +
+  last-owner protections (`organization/member*` audit events),
+  audit CSV export, staff-only read-only `support.lookup`
+  (self-auditing). Dashboard Team view.
+- **Public docs**: docs/api/webhooks.md, sdk-examples.md
+  (Python stdlib + Node), hmac-test-vectors.md — vectors
+  produced by the production signers and ASSERTED by
+  tests/integration/test_hmac_vectors.py (docs cannot drift).
+- VERIFIED (actually run): backend `pytest` **163 passed, 1
+  skipped**; ruff clean; frontend typecheck + vitest (9) +
+  build green. A deposit-payload field bug (`to_address` vs
+  `address`) was caught by the chain suites and fixed — every
+  family's credit path exercises emission.
+- NOT verified: live webhook delivery (egress), payment
+  collection (intentionally off-platform), deployed
+  fresh-tenant walkthrough, PostgreSQL, CI, Temporal. Signing
+  gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

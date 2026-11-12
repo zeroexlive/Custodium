@@ -14,10 +14,13 @@ from waas.modules.networks.api.router import router as networks_router
 from waas.modules.operations.api.router import dashboard_router as operations_dashboard_router
 from waas.modules.operations.api.router import router as operations_router
 from waas.modules.organizations.api.router import router as organizations_router
+from waas.modules.plans.api.router import router as plans_router
 from waas.modules.projects.api.router import router as projects_router
 from waas.modules.sweeps.api.router import dashboard_router as sweeps_dashboard_router
 from waas.modules.sweeps.api.router import router as sweeps_router
 from waas.modules.wallets.api.router import router as wallets_router
+from waas.modules.webhooks.api.router import dashboard_router as webhooks_dashboard_router
+from waas.modules.webhooks.api.router import router as webhooks_router
 
 # All APIs here authenticate with bearer tokens or HMAC signatures, never
 # cookie sessions, so Django's cookie CSRF threat model does not apply to
@@ -40,6 +43,9 @@ api.add_router("", operations_router)
 api.add_router("", operations_dashboard_router)
 api.add_router("", sweeps_router)
 api.add_router("", sweeps_dashboard_router)
+api.add_router("", webhooks_router)
+api.add_router("", webhooks_dashboard_router)
+api.add_router("", plans_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but

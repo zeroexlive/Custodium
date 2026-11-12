@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     "waas.modules.ton",
     "waas.modules.operations",
     "waas.modules.sweeps",
+    "waas.modules.webhooks",
+    "waas.modules.plans",
 ]
 
 MIDDLEWARE = [

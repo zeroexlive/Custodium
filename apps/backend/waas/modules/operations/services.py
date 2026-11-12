@@ -281,6 +281,25 @@ def _reverse_service_fee(request: WithdrawalRequest) -> None:
     request.save(update_fields=["service_fee_charged", "updated_at"])
 
 
+def _emit_withdrawal_terminal(request: WithdrawalRequest) -> None:
+    from waas.modules.webhooks import services as webhook_services
+
+    webhook_services.emit_event(
+        project=request.project,
+        event_type=f"withdrawal.{request.status}",
+        data={
+            "withdrawal_id": str(request.id),
+            "wallet_id": str(request.wallet_id),
+            "network": request.network.slug,
+            "asset": request.asset.symbol,
+            "amount": str(int(request.amount)),
+            "destination_address": request.destination_address,
+            "tx_hash": request.chain_tx_hash,
+            "status_reason": request.status_reason,
+        },
+    )
+
+
 # --------------------------------------------------------------- lifecycle
 
 
@@ -302,6 +321,7 @@ def dispatch_withdrawal(
         request.status = WithdrawalRequest.Status.FAILED
         request.status_reason = f"service fee charge failed: {exc}"[:500]
         request.save(update_fields=["status", "status_reason", "updated_at"])
+        _emit_withdrawal_terminal(request)
         return request
     try:
         chain_tx = dispatch.execute(request, factories=factories)
@@ -313,6 +333,7 @@ def dispatch_withdrawal(
         request.status_reason = f"dispatch error: {exc}"[:500]
         request.save(update_fields=["status", "status_reason", "updated_at"])
         _reverse_service_fee(request)
+        _emit_withdrawal_terminal(request)
         return request
     family = dispatch.family_of(request.network)
     request.chain_family = family
@@ -348,6 +369,8 @@ def dispatch_withdrawal(
             "status": request.status,
         },
     )
+    if request.status in (WithdrawalRequest.Status.COMPLETED, WithdrawalRequest.Status.FAILED):
+        _emit_withdrawal_terminal(request)
     return request
 
 
@@ -397,6 +420,7 @@ def refresh_withdrawal(
             project=request.project,
             metadata={"request": str(request.id), "actual_fee": str(request.actual_fee)},
         )
+        _emit_withdrawal_terminal(request)
     return request
 
 
