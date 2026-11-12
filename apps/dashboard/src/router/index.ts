@@ -18,6 +18,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'sweeps', name: 'sweeps', component: () => import('@/features/sweeps/SweepsView.vue') },
       { path: 'sweep-endpoint', name: 'sweep-endpoint', component: () => import('@/features/sweeps/SweepEndpointView.vue') },
       { path: 'blacklist', name: 'blacklist', component: () => import('@/features/blacklist/BlacklistView.vue') },
+      { path: 'withdrawals', name: 'withdrawals', component: () => import('@/features/withdrawals/WithdrawalsView.vue') },
       { path: 'webhooks', name: 'webhooks', component: () => import('@/features/webhooks/WebhooksView.vue') },
       { path: 'audit', name: 'audit', component: () => import('@/features/audit/AuditView.vue') },
     ],

@@ -49,6 +49,9 @@ class EvmTransaction(models.Model):
     raw_transaction = models.TextField(blank=True)  # hex, once signed
     tx_hash = models.CharField(max_length=66, blank=True, db_index=True)
     block_number = models.BigIntegerField(null=True, blank=True)
+    fee_wei = models.DecimalField(
+        max_digits=78, decimal_places=0, null=True, blank=True
+    )  # gasUsed * effectiveGasPrice, captured at confirmation
     reservation = models.ForeignKey(
         BalanceReservation,
         on_delete=models.PROTECT,

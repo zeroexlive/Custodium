@@ -262,7 +262,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 9 — Financial Operations
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/architecture/phase-9-operations.md` (the live-testnet
+  soak exit criterion remains open: chain APIs unreachable from
+  the build sandbox).
 - **Goal:** The operator-grade finance layer across all enabled chains.
 
 ### Tasks

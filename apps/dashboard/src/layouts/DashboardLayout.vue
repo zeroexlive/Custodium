@@ -37,6 +37,7 @@ const groups: NavGroup[] = [
     title: 'General',
     items: [
       { to: '/blacklist', label: 'Blacklist' },
+      { to: '/withdrawals', label: 'Withdrawals' },
       { to: '/webhooks', label: 'Webhooks' },
       { to: '/audit', label: 'Audit Logs' },
     ],

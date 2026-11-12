@@ -237,6 +237,10 @@ def confirm_transaction(
                 reservation=tx.reservation,
                 idempotency_key=f"{tx.idempotency_key}:settle",
             )
+        try:
+            tx.fee_lamports = provider.get_transaction_fee(tx.signature)
+        except Exception:
+            tx.fee_lamports = None  # fee reporting must not block settlement
         tx.status = SolanaTransaction.Status.CONFIRMED
-        tx.save(update_fields=["status", "updated_at"])
+        tx.save(update_fields=["status", "fee_lamports", "updated_at"])
     return tx
