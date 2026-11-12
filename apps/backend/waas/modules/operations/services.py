@@ -28,6 +28,7 @@ from django.utils import timezone
 from waas.modules.assets.models import Asset
 from waas.modules.audit.models import AuditEvent
 from waas.modules.blacklist import services as blacklist_services
+from waas.modules.gasstation.services import GasTopUpPending
 from waas.modules.ledger import services as ledger_services
 from waas.modules.ledger.models import AccountType, JournalEntry
 from waas.modules.networks.models import BlockchainNetwork
@@ -335,6 +336,15 @@ def dispatch_withdrawal(
         return request
     try:
         chain_tx = dispatch.execute(request, factories=factories)
+    except GasTopUpPending as exc:
+        # Not a failure: a gas top-up is in flight. Return the
+        # request to APPROVED (the worker retries it), undo the
+        # service-fee charge, and record why it is waiting.
+        request.status = WithdrawalRequest.Status.APPROVED
+        request.status_reason = f"awaiting gas: {exc.reason}"[:500]
+        request.save(update_fields=["status", "status_reason", "updated_at"])
+        _reverse_service_fee(request)
+        return request
     except Exception as exc:
         # The operations layer is the worker's safety net: a
         # provider or pipeline exception must land the request in

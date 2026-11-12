@@ -938,3 +938,33 @@ a separate written approval decision; neither exists.
   executable; README + the 1-server tutorial now invoke it as
   `bash scripts/install.sh`. Local repo config `core.fileMode`
   set to false to silence the resulting mode-only diff.
+
+### 2026-11-13 — Gas station (post-roadmap module, William: "Implement gas station")
+- What: `waas/modules/gasstation/` — per-(project, network)
+  `GasStation` config (same-project funding wallet, threshold,
+  top-up amount, daily cap) + `GasTopUp` records keyed by the
+  operation's idempotency key. A preflight inside the shared
+  `operations.dispatch.execute_transfer` reads the wallet's
+  on-chain native balance via the family provider (EVM/Solana/TON
+  `get_balance`; TRON account read) before any non-native transfer:
+  below threshold it broadcasts a top-up from the funding wallet
+  through the ordinary pipeline (`gas:<operation_key>`, journaled
+  in the funding wallet's own scope — no special money path) and
+  raises `GasTopUpPending`; withdrawal dispatch returns the request
+  to `approved` with the service fee reversed, sweep execution
+  returns to `resolved` with the snapshot untouched. Unreadable
+  balances never block a transfer; native transfers, disabled
+  stations and self-funding pass through. Dashboard-only API
+  (owner/administrator; cross-project funding wallet rejected 422)
+  + a Gas Station dashboard view. Record:
+  `docs/architecture/gas-station.md`; README gained a highlight
+  bullet.
+- Verified: `tests/integration/test_gasstation.py` 6 passed (full
+  EVM deferral cycle incl. funding-reservation settlement and
+  zero native trial balance; sweep deferral resuming from the
+  same snapshot; cap/native/disabled/API cases). Full backend
+  suite **173 passed / 1 skipped**, ruff clean; frontend
+  typecheck + vitest 9 + build green.
+- NOT verified: live-chain top-ups (sandbox egress; provider-double
+  proof like every family). Production signing remains disabled;
+  top-ups inherit the fail-closed signer factories.

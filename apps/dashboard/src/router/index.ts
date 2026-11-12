@@ -17,6 +17,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'assets', name: 'assets', component: () => import('@/features/assets/AssetsView.vue') },
       { path: 'sweeps', name: 'sweeps', component: () => import('@/features/sweeps/SweepsView.vue') },
       { path: 'sweep-endpoint', name: 'sweep-endpoint', component: () => import('@/features/sweeps/SweepEndpointView.vue') },
+      { path: 'gas-station', name: 'gas-station', component: () => import('@/features/sweeps/GasStationView.vue') },
       { path: 'blacklist', name: 'blacklist', component: () => import('@/features/blacklist/BlacklistView.vue') },
       { path: 'withdrawals', name: 'withdrawals', component: () => import('@/features/withdrawals/WithdrawalsView.vue') },
       { path: 'webhooks', name: 'webhooks', component: () => import('@/features/webhooks/WebhooksView.vue') },

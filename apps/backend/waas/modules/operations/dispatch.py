@@ -89,6 +89,18 @@ def execute_transfer(
     chain transaction row. Shared by withdrawal dispatch
     (Phase 9) and sweeps (Phase 10) so both inherit identical
     chain safety (blacklist, signer gates, reservations)."""
+    # Gas station preflight: a non-native transfer from a wallet
+    # below the station threshold defers here (GasTopUpPending)
+    # after broadcasting a native top-up from the funding wallet.
+    from waas.modules.gasstation.services import preflight_transfer
+
+    preflight_transfer(
+        wallet=wallet,
+        network=network,
+        asset=asset,
+        operation_key=idempotency_key,
+        factories=factories,
+    )
     family = family_of(network)
     provider = factories.provider(network)
     kwargs = {

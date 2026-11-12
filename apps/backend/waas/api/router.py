@@ -7,6 +7,7 @@ from waas.modules.api_credentials.api.router import router as api_credentials_ro
 from waas.modules.assets.api.router import router as assets_router
 from waas.modules.audit.api.router import router as audit_router
 from waas.modules.blacklist.api.router import router as blacklist_router
+from waas.modules.gasstation.api.router import dashboard_router as gasstation_router
 from waas.modules.identity.api.router import router as identity_router
 from waas.modules.indexing.api.router import router as indexing_router
 from waas.modules.ledger.api.router import router as ledger_router
@@ -48,6 +49,7 @@ api.add_router("", sweeps_dashboard_router)
 api.add_router("", webhooks_router)
 api.add_router("", webhooks_dashboard_router)
 api.add_router("", plans_router)
+api.add_router("", gasstation_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but

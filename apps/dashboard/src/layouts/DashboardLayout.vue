@@ -31,6 +31,7 @@ const groups: NavGroup[] = [
       { to: '/assets', label: 'Assets & Networks' },
       { to: '/sweeps', label: 'Sweeps' },
       { to: '/sweep-endpoint', label: 'Sweep Endpoint' },
+      { to: '/gas-station', label: 'Gas Station' },
     ],
   },
   {
