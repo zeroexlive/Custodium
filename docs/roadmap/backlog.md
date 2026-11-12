@@ -218,7 +218,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 7 — Solana
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/blockchains/solana-implementation.md` (live-cluster
+  verification and the devnet round-trip remain open, as recorded
+  there).
 - **Goal:** Solana support: SOL and SPL tokens, signed via FROST Ed25519.
 
 ### Tasks

@@ -156,16 +156,19 @@ def _record_deposit(
 ) -> bool:
     """Create + observe a deposit unless this exact chain event was
     already recorded. Returns True when a new deposit was created."""
+    # Hashes and addresses are stored EXACTLY as the family scanner
+    # passes them: hex families canonicalise to lowercase, base58
+    # families (Solana) are case-significant and must not be folded.
     deposit, created = ObservedDeposit.objects.get_or_create(
         network=network,
-        tx_hash=tx_hash.lower(),
+        tx_hash=tx_hash,
         occurrence=occurrence,
-        block_hash=block_hash.lower(),
+        block_hash=block_hash,
         defaults={
             "address": address_row,
             "wallet": address_row.wallet,
             "asset": asset,
-            "from_address": from_address.lower(),
+            "from_address": from_address,
             "amount": amount,
             "block_number": block_number,
         },
@@ -209,9 +212,9 @@ def _detect_in_block(
                 network=network,
                 address_row=watched[to],
                 asset=native_asset,
-                tx_hash=str(tx["hash"]),
+                tx_hash=str(tx["hash"]).lower(),
                 occurrence=index,
-                from_address=str(tx.get("from", "")),
+                from_address=str(tx.get("from", "")).lower(),
                 amount=value,
                 block_number=block_number,
                 block_hash=block_hash,
@@ -243,7 +246,7 @@ def _detect_in_block(
                 network=network,
                 address_row=watched[to],
                 asset=asset,
-                tx_hash=str(log["transactionHash"]),
+                tx_hash=str(log["transactionHash"]).lower(),
                 occurrence=int(log["logIndex"], 16),
                 from_address="0x" + topics[1][-40:].lower(),
                 amount=amount,
@@ -411,6 +414,7 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
 
     from waas.modules.evm.models import EvmTransaction
     from waas.modules.ledger.models import LedgerAccount
+    from waas.modules.solana.models import SolanaTransaction
     from waas.modules.tron.models import TronTransaction
 
     deposit_totals = {
@@ -421,7 +425,7 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
         .annotate(total=Sum("amount"))
     }
     withdrawal_totals: dict = {}
-    for model in (EvmTransaction, TronTransaction):
+    for model in (EvmTransaction, TronTransaction, SolanaTransaction):
         for row in (
             model.objects.filter(network=network, status=model.Status.CONFIRMED)
             .values("asset")

@@ -39,6 +39,7 @@ from waas.modules.indexing.models import ObservedDeposit
 from waas.modules.networks.models import BlockchainNetwork
 from waas.modules.organizations.models import Membership
 from waas.modules.projects.models import Project
+from waas.modules.solana.models import SolanaTransaction
 from waas.modules.tron.models import TronTransaction
 from waas.modules.wallets.models import Wallet
 
@@ -65,6 +66,11 @@ def _caller_projects(request, project_id: str | None) -> list[Project]:
         "organization_id", flat=True
     )
     return list(Project.objects.filter(organization_id__in=list(memberships)))
+
+
+def _block_value(withdrawal) -> int | None:
+    value = getattr(withdrawal, 'block_number', None)
+    return value if value is not None else getattr(withdrawal, 'slot', None)
 
 
 def _confirmations(network: BlockchainNetwork, block_number: int | None) -> int | None:
@@ -121,6 +127,12 @@ def _public_projection(network: BlockchainNetwork, tx_hash: str) -> dict | None:
         )
         if tron_tx is not None:
             withdrawal = tron_tx
+    if withdrawal is None:
+        withdrawal = (
+            SolanaTransaction.objects.filter(network=network, signature=tx_hash)
+            .select_related("asset")
+            .first()
+        )
     if withdrawal is not None:
         return {
             "network": network.slug,
@@ -128,9 +140,9 @@ def _public_projection(network: BlockchainNetwork, tx_hash: str) -> dict | None:
             "status": _STATUS_MAP.get(withdrawal.status, "pending"),
             "indexed": True,
             "belongs_to_tenant": False,
-            "block_or_slot": withdrawal.block_number,
+            "block_or_slot": _block_value(withdrawal),
             "timestamp": None,
-            "confirmations": _confirmations(network, withdrawal.block_number),
+            "confirmations": _confirmations(network, _block_value(withdrawal)),
             "matched_addresses": [],
             "transfers": [
                 {
@@ -212,6 +224,14 @@ def _tenant_projection(
             .select_related("asset", "wallet")
             .first()
         )
+    if withdrawal is None:
+        withdrawal = (
+            SolanaTransaction.objects.filter(
+                network=network, signature=tx_hash, wallet__project__in=projects
+            )
+            .select_related("asset", "wallet")
+            .first()
+        )
     if withdrawal is not None:
         wallet = withdrawal.wallet
         return {
@@ -220,9 +240,9 @@ def _tenant_projection(
             "status": _STATUS_MAP.get(withdrawal.status, "pending"),
             "indexed": True,
             "belongs_to_tenant": True,
-            "block_or_slot": withdrawal.block_number,
+            "block_or_slot": _block_value(withdrawal),
             "timestamp": None,
-            "confirmations": _confirmations(network, withdrawal.block_number),
+            "confirmations": _confirmations(network, _block_value(withdrawal)),
             "matched_addresses": [
                 {
                     "address_id": "",
@@ -265,7 +285,7 @@ def lookup_transaction(request, network: str, hash: str, project_id: str | None 
     if network_obj.signature_family == "ecdsa_secp256k1" and network_obj.chain_id is not None:
         if not _EVM_HASH_RE.match(hash):
             raise HttpError(422, "Malformed transaction hash for this network")
-    tx_hash = hash.lower()
+    tx_hash = hash if network_obj.signature_family == 'ed25519' else hash.lower()
     projects = _caller_projects(request, project_id)
     result = _tenant_projection(network_obj, tx_hash, projects)
     belongs = result is not None

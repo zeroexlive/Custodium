@@ -13,6 +13,10 @@ from waas.modules.evm.chains import resolve_chain
 from waas.modules.evm.provider import EvmProvider
 from waas.modules.indexing import services
 from waas.modules.networks.models import BlockchainNetwork
+from waas.modules.solana.chains import SOLANA_NETWORK_SLUGS
+from waas.modules.solana.chains import resolve_chain as resolve_solana_chain
+from waas.modules.solana.indexing import scan_solana_once
+from waas.modules.solana.provider import SolanaProvider
 from waas.modules.tron.chains import TRON_NETWORK_SLUGS
 from waas.modules.tron.chains import resolve_chain as resolve_tron_chain
 from waas.modules.tron.indexing import scan_tron_once
@@ -41,7 +45,9 @@ class Command(BaseCommand):
         else:
             networks = list(
                 BlockchainNetwork.objects.filter(
-                    slug__in=EVM_SLUGS + sorted(TRON_NETWORK_SLUGS)
+                    slug__in=EVM_SLUGS
+                    + sorted(TRON_NETWORK_SLUGS)
+                    + sorted(SOLANA_NETWORK_SLUGS)
                 )
             )
         while True:
@@ -50,6 +56,12 @@ class Command(BaseCommand):
                 if network.slug in TRON_NETWORK_SLUGS:
                     provider = TronProvider(resolve_tron_chain(network))
                     report = scan_tron_once(
+                        network=network, provider=provider,
+                        max_blocks=options["max_blocks"],
+                    )
+                elif network.slug in SOLANA_NETWORK_SLUGS:
+                    provider = SolanaProvider(resolve_solana_chain(network))
+                    report = scan_solana_once(
                         network=network, provider=provider,
                         max_blocks=options["max_blocks"],
                     )
