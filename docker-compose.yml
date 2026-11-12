@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-custodium}
+      POSTGRES_USER: ${POSTGRES_USER:-custodium}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-custodium-dev-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-custodium}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  temporal:
+    # Development server only (single binary, in-memory by default).
+    # Production Temporal is a separate, deliberately operated deployment.
+    image: temporalio/temporal:latest
+    command: server start-dev --ip 0.0.0.0 --ui-port 8233 --port 7233
+    ports:
+      - "7233:7233"
+      - "8233:8233"
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-secret-key-change-me}
+      DATABASE_URL: postgres://${POSTGRES_USER:-custodium}:${POSTGRES_PASSWORD:-custodium-dev-password}@postgres:5432/${POSTGRES_DB:-custodium}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_networks_assets &&
+             python manage.py runserver 0.0.0.0:8000"
+
+  dashboard:
+    build:
+      context: ./apps/dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    # Vite dev server proxies /api -> backend:8000 (see vite.config.ts,
+    # VITE_API_PROXY_TARGET inside the dashboard Dockerfile).
+
+volumes:
+  postgres_data:
