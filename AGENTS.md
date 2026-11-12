@@ -933,3 +933,8 @@ a separate written approval decision; neither exists.
   NOT verified: a real end-to-end install run (would mutate the
   dev environment), Compose execution (no Docker), interactive
   TTY prompts (dry-run used --yes).
+- Follow-up fix (same day): the snapshot connector records files
+  as mode 644, so the GitHub copy of `scripts/install.sh` is not
+  executable; README + the 1-server tutorial now invoke it as
+  `bash scripts/install.sh`. Local repo config `core.fileMode`
+  set to false to silence the resulting mode-only diff.
