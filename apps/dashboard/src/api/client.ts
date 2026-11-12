@@ -1,6 +1,8 @@
 import type {
-  ApiKey, ApiKeyCreated, Asset, AuthResponse, Network, Organization, Project,
-  SweepDestinationEndpoint, TransactionLookup, User,
+  ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
+  BlacklistEntry, BlacklistScope, Network, Organization, Project,
+  ProjectBalances, SweepDestinationEndpoint, TransactionLookup, User, Wallet,
+  WalletAddress, WalletBalances,
 } from './types'
 
 export class ApiError extends Error {
@@ -81,6 +83,49 @@ export const api = {
   // Transaction hash explorer
   lookupTransaction: (network: string, hash: string) =>
     request<TransactionLookup>('GET', `/transactions/lookup?network=${encodeURIComponent(network)}&hash=${encodeURIComponent(hash)}`),
+
+  // Wallets (Phase 2 records; MPC key generation itself is Phase 3)
+  listWallets: async (filters: { project_id: string; external_customer_id?: string; status?: string }): Promise<Wallet[]> => {
+    const params = new URLSearchParams({ project_id: filters.project_id })
+    if (filters.external_customer_id) params.set('external_customer_id', filters.external_customer_id)
+    if (filters.status) params.set('status', filters.status)
+    return listOf(await request<Wallet[] | { items: Wallet[] }>('GET', `/wallets?${params.toString()}`))
+  },
+  createWallet: (payload: { project_id: string; label: string; external_customer_id?: string }) =>
+    request<Wallet>('POST', '/wallets', payload),
+  getWallet: (id: string) => request<Wallet>('GET', `/wallets/${encodeURIComponent(id)}`),
+  /** Invalid transitions are rejected with 409 — e.g. a provisioning wallet
+   *  cannot be activated through the API before MPC key generation. */
+  setWalletStatus: (id: string, status: 'active' | 'frozen' | 'archived') =>
+    request<Wallet>('PATCH', `/wallets/${encodeURIComponent(id)}/status`, { status }),
+
+  // Addresses — listing only. Derivation arrives with MPC Phase 3/4 and the
+  // POST endpoint returns 501 until then; there is deliberately no create call.
+  listWalletAddresses: async (walletId: string, network?: string): Promise<WalletAddress[]> => {
+    const query = network ? `?network=${encodeURIComponent(network)}` : ''
+    return listOf(await request<WalletAddress[] | { items: WalletAddress[] }>('GET', `/wallets/${encodeURIComponent(walletId)}/addresses${query}`))
+  },
+
+  // Balances — integer base-unit strings, displayed raw by the views.
+  getProjectBalances: (projectId: string) =>
+    request<ProjectBalances>('GET', `/projects/${encodeURIComponent(projectId)}/balances`),
+  getWalletBalances: (walletId: string) =>
+    request<WalletBalances>('GET', `/wallets/${encodeURIComponent(walletId)}/balances`),
+
+  // Manual blacklist — a manually curated list only, not an AML/KYT system.
+  listBlacklistEntries: async (organizationId: string): Promise<BlacklistEntry[]> =>
+    listOf(await request<BlacklistEntry[] | { items: BlacklistEntry[] }>('GET', `/blacklist/entries?organization_id=${encodeURIComponent(organizationId)}`)),
+  createBlacklistEntry: (payload: {
+    scope: BlacklistScope; organization_id?: string; project_id?: string;
+    network: string; address: string; reason: string; expires_at?: string;
+  }) => request<BlacklistEntry>('POST', '/blacklist/entries', payload),
+  disableBlacklistEntry: (id: string) =>
+    request<BlacklistEntry>('POST', `/blacklist/entries/${encodeURIComponent(id)}/disable`),
+  checkBlacklist: (params: { address: string; network: string; organization_id?: string }) => {
+    const query = new URLSearchParams({ address: params.address, network: params.network })
+    if (params.organization_id) query.set('organization_id', params.organization_id)
+    return request<BlacklistCheckResult>('GET', `/blacklist/check?${query.toString()}`)
+  },
 
   // Sweep destination resolver endpoint
   getSweepEndpoint: () => request<SweepDestinationEndpoint>('GET', '/sweep-destination-endpoint'),

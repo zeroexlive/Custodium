@@ -57,8 +57,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Architecture & Security Research | Implemented (verified locally 2026-11-12; not Security Reviewed / Production Approved) |
-| 1 | Repository & SaaS Foundation | Implemented (verified locally 2026-11-12; commit local — push blocked, see history; not Security Reviewed / Production Approved) |
-| 2 | Wallet & Asset Foundation | Planned |
+| 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
+| 2 | Wallet & Asset Foundation | Implemented (verified locally 2026-11-12; see history; not Security Reviewed / Production Approved) |
 | 3 | MPC Infrastructure | Planned (skeleton scaffolded in Phase 0, signing NOT implemented) |
 | 4 | Ethereum & BSC | Planned |
 | 5 | Blockchain Indexing & Lookup | Planned |
@@ -258,6 +258,88 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
   once (its full content is in the local repo). Outstanding after the
   merge: William adds `.github/workflows/ci.yml` on GitHub; until then
   the repo has no CI — do not claim CI is active.
+- Outcome: Phase 1 snapshot (160 paths) pushed cleanly in ~23 s once
+  `ci.yml` was excluded — confirming the Workflows-permission diagnosis.
+  Branch commit `db4a81994763e997eef100bc481f9fa499505775`; sync record
+  appended. PR **#2** merged to `main`, merge commit
+  `560c56c0d42b6138c6f45168277965100bd57da8`. Verified on remote `main`:
+  commits [P1 merge, P1, P0 merge, P0, initial] and
+  `apps/backend/pyproject.toml` readable. Local branches realigned to
+  origin afterwards; this entry rides the Phase 2 commit.
+- Phases 0 and 1 are now both complete on GitHub `main`. Next: Phase 2
+  (Wallet & Asset Foundation).
+- CI: William added `.github/workflows/ci.yml` via the web UI
+  (commit `268b5c3` on `main`), verified byte-identical to the prepared
+  file. CI run results are not visible through the Muse connector;
+  the `mpc-skeleton` job runs the Rust tests for the first time
+  anywhere — treat its first result as unverified until seen.
+
+### 2026-11-12 — Phase 2 IMPLEMENTED & VERIFIED LOCALLY (Wallet & Asset Foundation)
+- **Ledger (ADR 0007)** — `waas/modules/ledger/`: chart-of-accounts
+  accounts per project+asset (+ optional wallet / customer sub-scope);
+  journal entries + lines, amounts NUMERIC(78,0) exact integers;
+  append-only at the model layer (update/delete raise; DB-trigger
+  enforcement is Phase 12 hardening, not present yet); balanced-entry
+  enforcement; idempotency keys with payload-hash conflict detection;
+  journal-backed reservations (Dr customer_available /
+  Cr withdrawal_reserved) with row-locked availability checks —
+  double-spend of internal balances is structurally prevented;
+  settle/release one-way state machine; reversals as negating entries;
+  trial balance always exactly 0. Exit-criteria coverage: invariant,
+  duplicate-delivery (idempotent replay) and domain worked-example
+  (§11: deposit 100 → reserve/settle 30 → sweep 50, customer claim
+  stays 70) tests all pass. True parallel-concurrency testing needs
+  PostgreSQL (test DB is in-memory SQLite); protection rests on row
+  locks + unique constraints, recorded honestly.
+- **SQLite caveat (found by testing):** Django adapts DecimalField
+  through float on SQLite, so wei-scale amounts lose exactness there
+  (raw sqlite3 INTEGER storage is exact; the ORM path is not). A
+  `ledger.W001` system-check warning now fires on SQLite, the
+  >64-bit wei test is PostgreSQL-only (skipped on SQLite), and
+  PostgreSQL remains the only money-safe database. This is a test/dev
+  environment limitation, not a ledger-design change.
+- **Wallets** — project-scoped MPC wallet records; status starts
+  `provisioning` and CANNOT be activated via API (409) — activation
+  happens only when MPC key generation completes (Phase 3); freeze /
+  unfreeze / archive transitions with role checks; idempotency-key
+  replay on create; machine API with `wallets:write/read` scopes;
+  tenant isolation (404, no oracle). Address records are created ONLY
+  by the internal `record_derived_address` service (Phases 3-4 will
+  call it after real derivation); `POST /wallets/{id}/addresses`
+  returns an honest 501 until then. `POST /addresses/resolve` is
+  tenant-scoped.
+- **Manual blacklist** — platform/tenant scopes per
+  `docs/blacklist/manual-blacklist.md` (tenant-admin roles for tenant
+  entries, staff for platform, soft-disable only, reasons required,
+  expiry honoured); per-chain normalisation in
+  `waas/common/address_normalization.py` (EVM lowercase, TRON
+  Base58Check→canonical hex, Solana base58/32-byte, TON friendly→raw
+  with CRC16 verification); check endpoint returns only
+  blacklisted + matched scopes, never reasons. It is a manual list —
+  not an AML/KYT system, and is not described as one anywhere.
+- **Balances API** — `GET /projects/{id}/balances` and
+  `GET /wallets/{id}/balances`: ledger-derived, amounts as integer
+  strings, never floats, never chain RPC.
+- **Dashboard** — Wallets / Addresses / Blacklist views wired to the
+  real APIs (typed client + types, project/org selectors, status
+  badges, confirm-gated status actions, raw base-unit balance tables,
+  honest 501 notice on Addresses, "not an AML system" copy on
+  Blacklist); 5 new client tests.
+- VERIFIED (actually run): backend `uv run pytest` → **54 passed,
+  1 skipped** (PostgreSQL-only wei-scale branch); `ruff check` clean;
+  Django check → only the deliberate `ledger.W001` SQLite warning;
+  frontend `npm run typecheck` clean, `npm test` → **9 passed**,
+  `npm run build` → success (lead re-ran all frontend checks after
+  the dashboard work landed).
+- NOT verified: ledger on PostgreSQL (no Postgres/Docker in this VM;
+  Compose + CI are the path), threaded concurrency, Docker stack,
+  CI run results (see above).
+- Phase 2 is committed locally as ONE commit on top of the Phase 1
+  snapshot commit; push uses the snapshot procedure (remote wip head
+  must be `db4a819...`). Local branches need realigning with origin
+  after the merge (origin/main also carries William's ci.yml commit
+  `268b5c3`, which the wip branch does not contain — merges handle
+  this; the file must not be added to snapshot manifests).
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

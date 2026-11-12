@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     "waas.modules.networks",
     "waas.modules.assets",
     "waas.modules.audit",
+    "waas.modules.wallets",
+    "waas.modules.ledger",
+    "waas.modules.blacklist",
 ]
 
 MIDDLEWARE = [

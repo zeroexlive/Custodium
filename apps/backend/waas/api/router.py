@@ -7,10 +7,13 @@ from waas.api.authentication import AnyAuth, DashboardAuth
 from waas.modules.api_credentials.api.router import router as api_credentials_router
 from waas.modules.assets.api.router import router as assets_router
 from waas.modules.audit.api.router import router as audit_router
+from waas.modules.blacklist.api.router import router as blacklist_router
 from waas.modules.identity.api.router import router as identity_router
+from waas.modules.ledger.api.router import router as ledger_router
 from waas.modules.networks.api.router import router as networks_router
 from waas.modules.organizations.api.router import router as organizations_router
 from waas.modules.projects.api.router import router as projects_router
+from waas.modules.wallets.api.router import router as wallets_router
 
 # All APIs here authenticate with bearer tokens or HMAC signatures, never
 # cookie sessions, so Django's cookie CSRF threat model does not apply to
@@ -25,6 +28,9 @@ api.add_router("", api_credentials_router)
 api.add_router("", networks_router)
 api.add_router("", assets_router)
 api.add_router("", audit_router)
+api.add_router("", wallets_router)
+api.add_router("", ledger_router)
+api.add_router("", blacklist_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but
