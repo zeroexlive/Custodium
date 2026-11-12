@@ -21,7 +21,7 @@ _TON_RAW_RE = re.compile(r"^(-?\d+):([0-9a-fA-F]{64})$")
 # NOT assumed — callers pass the family explicitly when they know it).
 FAMILY_BY_SLUG = {
     "ethereum": "evm",
-    "sepolia": "evm",
+    "ethereum-sepolia": "evm",
     "bsc": "evm",
     "bsc-testnet": "evm",
     "tron": "tron",

@@ -59,8 +59,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 0 | Architecture & Security Research | Implemented (verified locally 2026-11-12; not Security Reviewed / Production Approved) |
 | 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
 | 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
-| 3 | MPC Infrastructure | Implemented (evaluation) 2026-11-12 — candidates executed test-only; cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
-| 4 | Ethereum & BSC | Planned |
+| 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
+| 4 | Ethereum & BSC | Implemented 2026-11-12 — EVM module + withdrawal pipeline + MPC cross-proof; live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
 | 5 | Blockchain Indexing & Lookup | Planned |
 | 6 | TRON | Planned |
 | 7 | Solana | Planned |
@@ -420,6 +420,77 @@ exit 2 with refusal message).
   ceremonies (single-process simulation only), FROST refresh
   execution, presignature flows (deliberately untouched),
   HD derivation (feature off).
+- Outcome: snapshot push (13 paths) → branch commit
+  `f6e68399ec9518ee6ec591faf4f540a59c09d7fc`; PR **#4** merged to
+  `main`, merge commit `d7656b65a764cad89aeaefcf8b0582767d96dd4b`,
+  verified via GitHub API (main = [P3 merge, P3, P2 merge, ...]).
+  Sync record appended (4 entries). Local branches realigned; this
+  note rides the Phase 4 commit. Next: Phase 4 (Ethereum & BSC) —
+  note its address-generation/signing integration builds on the
+  Phase 3 harness patterns, but production signing remains gated
+  on the independent review; Phase 4 work must keep test-only keys
+  clearly separated from any production path.
+
+### 2026-11-12 — Phase 4 COMPLETE (Ethereum & BSC)
+Full record: `docs/blockchains/evm-implementation.md`.
+- **New backend module `waas/modules/evm/`**: pure-Python RLP;
+  Keccak/address math + ecrecover (`keys.py`, no private keys
+  anywhere); EIP-1559 + legacy builders for native and generic
+  ERC-20/BEP-20 transfers (`transactions.py`); JSON-RPC provider
+  with endpoint failover, **chain-id verification** (wrong chain
+  fails closed), revert/nonce/replacement error taxonomy,
+  idempotent broadcast, `trust_env=False` (no ambient proxy)
+  (`provider.py`); chains bound to registry slugs ethereum(1) /
+  ethereum-sepolia(11155111) / bsc(56) / bsc-testnet(97)
+  (`chains.py`); dependency added: pycryptodome (Keccak-256,
+  verified against canonical vectors).
+- **Address integration**: `register_wallet_evm_addresses` derives
+  the EVM address from a wallet's MPC group public key and records
+  it on all 4 EVM networks via `record_derived_address`. Wallet
+  activation semantics unchanged (still review-gated).
+- **Withdrawal pipeline** (`service.py` + `EvmTransaction` model):
+  reserve → build → sign → broadcast → confirm → settle;
+  idempotency keys at the row and every ledger call; blacklist
+  check before any state is created; reservation scope = the
+  wallet's customer scope; failure semantics incl. the safe one —
+  broadcast-outcome-unknown ⇒ DROPPED with the reservation HELD
+  (never auto-release: double-pay risk). Signing goes through
+  `SignerPort`; the only wired implementation is the fail-closed
+  `UnavailableSigner`, so production attempts abort cleanly at
+  signing with funds restored (asserted by test). Pipeline is a
+  synchronous service mapping 1:1 onto ADR 0003 Temporal
+  activities; Temporal itself NOT wired this phase.
+- **Cross-proof (the phase's centrepiece)**: Python-built Sepolia
+  tx sighashes are pinned as fixtures on BOTH sides; the Rust
+  harness signed both digests in ONE cggmp24 ceremony
+  (`run_ceremony_for_digests`, `PrehashedDataToSign` — preimages
+  are our own constructed transactions, the documented safe case)
+  and proved `ecrecover == group-key address` for each. PASSED.
+- **Bugs found & fixed**: EIP-55 checksum zip over a 64-char digest
+  (mine); Phase 2's `FAMILY_BY_SLUG` said `sepolia` while the
+  registry seeds `ethereum-sepolia` — would have broken Sepolia
+  address recording in production; map corrected.
+- VERIFIED (actually run): backend `pytest` **87 passed, 1
+  skipped** (skip = the known PostgreSQL wei-scale case); ruff
+  clean. Vectors: EIP-155 canonical sighash AND signed bytes match
+  the EIP exactly; RLP wiki vectors; generator-point + EIP-155-key
+  addresses. Pipeline tests (doubles): round-trip reconciles
+  (trial balance 0), idempotent re-entry (one broadcast),
+  signer-unavailable abort + release, insufficient funds,
+  on-chain revert + release, blacklist rejection, ERC-20 build.
+  Rust: `cargo test --workspace` **16 passed, 0 failed** (6
+  harness incl. both ceremonies in 380.58 s, 3 transport, 7
+  policy).
+- NOT verified: **live RPC** — this sandbox's egress times out to
+  every public RPC tried (publicnode ×4 chains, rpc.sepolia.org,
+  Cloudflare, Binance seed; attempted directly) — provider covered
+  by mock-transport tests instead; **funded testnet broadcast /
+  on-chain deposit→withdraw round-trip** (no faucet access from
+  here, and deposit indexing is Phase 5 by design); PostgreSQL
+  execution; Docker; CI runs (connector cannot read Actions);
+  replace-by-fee automation. The backlog's Phase 4 exit criterion
+  is met except the on-chain round-trip, recorded as such in the
+  implementation doc §6–7. No mainnet enablement.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

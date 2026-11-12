@@ -56,6 +56,9 @@ ed25519-zebra = "4"
 # Independent ECDSA verifier used only by tests, to prove CGGMP-family
 # threshold signatures are standard secp256k1 ECDSA (as EVM chains expect).
 k256 = { version = "0.13", features = ["ecdsa"] }
+# Keccak-256 for the Phase 4 test that derives the EVM address of a
+# threshold group key and checks ecrecover against it (test-only).
+sha3 = "0.10"
 
 [lints]
 workspace = true

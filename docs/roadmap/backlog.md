@@ -148,7 +148,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 4 — Ethereum and BSC
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/blockchains/evm-implementation.md` for the record,
+  including the parts of the exit criteria that remain open
+  (on-chain testnet round-trip, Temporal wiring).
 - **Goal:** First live chains (testnets first): ETH, BNB, USDT, and
   arbitrary ERC-20 / BEP-20 tokens.
 
