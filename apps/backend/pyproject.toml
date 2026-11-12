@@ -16,6 +16,7 @@ dependencies = [
     "httpx>=0.27",
     "cryptography>=42",
     "gunicorn>=22",
+    "pycryptodome>=4.4.0",
 ]
 
 [dependency-groups]
