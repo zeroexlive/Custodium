@@ -1,5 +1,10 @@
-# Custodium MPC workspace — Phase 0 / skeleton only.
-# No threshold signing is implemented. See README.md.
+# Custodium MPC workspace.
+# Production crates remain fail-closed skeletons: no threshold signing
+# is implemented in them. Phase 3 adds ONE exception: the test-only
+# evaluation harness (crates/eval_harness), which pins the candidate
+# libraries to evaluate them with ephemeral in-memory keys. The
+# harness is never linked into production binaries. See
+# docs/mpc/phase-3-evaluation.md and README.md.
 [workspace]
 resolver = "2"
 members = ["crates/*"]
@@ -14,17 +19,17 @@ rust-version = "1.74"
 # Internal crates (path only).
 custodium-mpc-shared = { path = "crates/shared" }
 
-# --- External threshold-cryptography candidates: NOT ENABLED ---
-# The following are deliberately commented out. Do not uncomment, pin, or
-# vendor them until the protocol evaluation, licence/audit review, and an
-# independent cryptographic review are complete.
-#
-# cggmp21 = "=PINNED VERSION + INDEPENDENT REVIEW REQUIRED BEFORE ENABLEMENT"
-#   # Candidate: threshold ECDSA (CGGMP family) for secp256k1.
-# frost-ed25519 = "=PINNED VERSION + INDEPENDENT REVIEW REQUIRED BEFORE ENABLEMENT"
-#   # Candidate: FROST (RFC 9591) for Ed25519 (Solana / TON).
-# tonic / prost (gRPC stack) are likewise deferred until the proto codegen
-# approach is reviewed; the .proto contract lives in ../../packages/proto.
+# --- External threshold-cryptography candidates ---
+# Phase 3 (2026-11-12): versions are pinned ONLY inside
+# crates/eval_harness (test-only evaluation):
+#   cggmp24 = "=0.7.0-alpha.2"   (CGGMP family, threshold ECDSA;
+#     cggmp21 was rejected — see docs/mpc/phase-3-evaluation.md §CVE)
+#   frost-ed25519 = "=3.0.0"      (FROST, RFC 9591, Ed25519)
+# Production crates must not depend on them until the independent
+# cryptographic review (docs/mpc/review/) is complete.
+# tonic / prost (gRPC stack) are likewise deferred until the proto
+# codegen approach is reviewed; the .proto contract lives in
+# ../../packages/proto.
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

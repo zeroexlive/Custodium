@@ -58,8 +58,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 |---|---|---|
 | 0 | Architecture & Security Research | Implemented (verified locally 2026-11-12; not Security Reviewed / Production Approved) |
 | 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
-| 2 | Wallet & Asset Foundation | Implemented (verified locally 2026-11-12; see history; not Security Reviewed / Production Approved) |
-| 3 | MPC Infrastructure | Planned (skeleton scaffolded in Phase 0, signing NOT implemented) |
+| 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
+| 3 | MPC Infrastructure | Implemented (evaluation) 2026-11-12 — candidates executed test-only; cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
 | 4 | Ethereum & BSC | Planned |
 | 5 | Blockchain Indexing & Lookup | Planned |
 | 6 | TRON | Planned |
@@ -340,6 +340,86 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
   after the merge (origin/main also carries William's ci.yml commit
   `268b5c3`, which the wip branch does not contain — merges handle
   this; the file must not be added to snapshot manifests).
+- Outcome: snapshot push (43 paths) → branch commit
+  `cecb411b946678a75e1cf90699fc1872899f3928`; PR **#3** merged to
+  `main`, merge commit `b0ba530130ca12e8217ef948951dcd6fbb1bba81`.
+  Verified on remote `main`: commits [P2 merge, P2, ci.yml, P1 merge,
+  ...] and `apps/backend/waas/modules/ledger/services.py` readable.
+  Sync record appended (3 entries). Local branches realigned to
+  origin; this note rides the Phase 3 commit. Next: Phase 3
+  (MPC Integration, test-only) — note it requires the Rust toolchain
+  and an independent-review process; neither exists in this VM yet,
+  so expect environment work before code.
+- Phase 3 prep (2026-11-12): Rust toolchain installed in the dev VM
+  (rustup, stable, **rustc/cargo 1.99.1**, minimal profile — the
+  rustfmt/clippy components fail to install on this VM's filesystem
+  with EPERM, so `cargo fmt`/`cargo clippy` are unavailable here).
+  First-ever execution of the MPC skeleton tests:
+  `cargo test --workspace` in `services/mpc/` → **10 passed, 0
+  failed** (7 signing_policy + 3 secure_transport), workspace
+  compiles clean. This closes the Phase 0 "Rust tests written but
+  not executed" gap. No Phase 3 feature code yet: DKG/signing
+  evaluation and the independent-review track start on William's
+  go-ahead.
+
+### 2026-11-12 — Phase 3 EVALUATION COMPLETE (MPC Integration, test-only)
+Full record: `docs/mpc/phase-3-evaluation.md`. Production crates
+unchanged and still fail-closed; the only new code is the test-only
+harness `services/mpc/crates/eval_harness/` (+ env-gated `mpc-eval`
+binary, refuses to run without `CUSTODIUM_MPC_EVAL=1` — verified:
+exit 2 with refusal message).
+- **FROST Ed25519 — pin `frost-ed25519 =3.0.0`.** Real DKG (2-of-3,
+  keys::dkg parts 1–3) + threshold signing by all three quorums;
+  below-threshold fails; tampered message fails; group signature
+  verifies with independent `ed25519-zebra` (standard Ed25519, as
+  Solana/TON require). 4 harness tests pass. NCC 2023 audit covers
+  an earlier release line — lineage evidence only, 3.0.0 is not
+  the audited artifact.
+- **ECDSA — Phase 0 candidate REJECTED, successor evaluated.**
+  `cggmp21` is not adopted at any version: CVE-2025-66016 /
+  RUSTSEC-2025-0129 (critical — missing ZK check in <0.6.3 lets one
+  malicious signer reconstruct the full private key; fixed 0.6.3)
+  and RUSTSEC-2025-0127 presignature forgery with NO patched
+  cggmp21 version; upstream's fix path is `cggmp24`. Evaluated
+  instead: **`cggmp24 =0.7.0-alpha.2`** — aux-info generation +
+  threshold DKG (2-of-3) + signing by parties {0,2} executed over
+  the round-based simulated network; identical signature from all
+  parties; verified by the library and independently by k256 as a
+  standard secp256k1 ECDSA signature. Ceremony ≈377 s in a debug
+  build on this 1.5-vCPU VM (safe-prime generation dominates; not
+  a production performance claim).
+- cggmp24 risks recorded, not waived: ALPHA line; NO key refresh
+  (neither threshold nor non-threshold — cggmp21 had non-threshold
+  refresh; compensating control = re-key + migrate, undecided);
+  no identifiable abort; t-of-n is the implementers' extension of
+  a non-threshold paper; Kudelski audit covers the cggmp21
+  codebase, not this alpha; rug/GMP backend mandatory (build needs
+  C toolchain + m4; m4 was built from source into ~/tools/m4
+  because the VM lacks it and apt has no package lists).
+- **Alpha-drift finding:** Cargo resolved `paillier-zk` /
+  `cggmp24-keygen` to alpha.4 (breaking API changes) despite the
+  alpha.2 requirement — remedied with exact pins + committed
+  `services/mpc/Cargo.lock`. In the alpha line the lockfile is
+  part of the pin; lockfile updates are security-relevant changes.
+- **Review:** package prepared at `docs/mpc/review/` (scope,
+  evidence checklist, candidate firms) — **NOT commissioned**
+  (William's action). Phase 3 exit criterion (b) is therefore
+  open: production signing stays disabled, wallets stay
+  `provisioning`, address generation stays gated, nothing may be
+  described as reviewed/production-ready. `docs/mpc/
+  protocol-evaluation.md` §2 marked superseded accordingly.
+- Temporal: ceremony→workflow mapping documented as design only
+  (evaluation §6); no Temporal MPC workflow implemented.
+- VERIFIED (actually run): `cargo test -p
+  custodium-mpc-eval-harness` → **5 passed, 0 failed** (4 FROST +
+  1 ECDSA ceremony, 377.11 s total); `cargo build` of the `mpc-eval`
+  binary + env-gate refusal check; full-workspace `cargo test
+  --workspace` before the Phase 3 commit → **15 passed, 0 failed**
+  (5 harness + 3 secure_transport + 7 signing_policy).
+- NOT verified: release-build performance, networked/multi-host
+  ceremonies (single-process simulation only), FROST refresh
+  execution, presignature flows (deliberately untouched),
+  HD derivation (feature off).
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

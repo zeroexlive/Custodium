@@ -1,0 +1,62 @@
+[package]
+name = "custodium-mpc-eval-harness"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+publish = false
+rust-version.workspace = true
+description = "Phase 3 TEST-ONLY evaluation harness for threshold-cryptography candidates. Never linked into production signer/coordinator binaries."
+
+[[bin]]
+name = "mpc-eval"
+path = "src/main.rs"
+
+[dependencies]
+# FROST (RFC 9591) Ed25519 candidate — Zcash Foundation. Pinned exactly
+# (Phase 3 pinning record: docs/mpc/phase-3-evaluation.md). The NCC Group
+# 2023 audit covered an earlier release line of this codebase; the pinned
+# version itself has NOT been independently audited for Custodium.
+frost-ed25519 = "=3.0.0"
+rand = "0.8"
+# CGGMP-family threshold ECDSA candidate (evaluation): cggmp24 is the
+# patched successor of cggmp21 — cggmp21 <=0.6.2 is critically vulnerable
+# (CVE-2025-66016, key reconstruction) and even 0.6.3 leaves the
+# presignature-forgery advisory (RUSTSEC-2025-0127) unpatched upstream.
+# ALPHA version: API instability is itself an evaluation finding.
+cggmp24 = { version = "=0.7.0-alpha.2", features = ["curve-secp256k1"] }
+# Supporting crates for the evaluation driver: the round-based simulated
+# network (the same runtime the production transport will plug into),
+# a tokio runtime to execute the async protocols, and the RNG/hash
+# versions the pinned candidates are built against.
+round-based = { version = "=0.4.2", features = ["sim-async"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
+rand_core = "0.6"
+sha2 = "0.10"
+generic-ec = "0.4"
+# The CGGMP Paillier stack requires the top-level consumer to select an
+# arithmetic backend. cggmp24 0.7.0-alpha.2 is written against the rug
+# (GMP) backend of paillier-zk — the num-bigint backend does not
+# compile it — so the evaluation selects rug. GMP builds from source
+# via gmp-mpfr-sys (needs a C toolchain + m4 at build time).
+fast-paillier = { version = "0.3", features = ["backend-rug"] }
+# Alpha-line version drift control: cggmp24 0.7.0-alpha.2 was built
+# against paillier-zk / cggmp24-keygen 0.7.0-alpha.2, but Cargo's
+# prerelease range rules resolve NEWER alphas (alpha.4) whose APIs
+# changed (e.g. the `paillier_zk::rug` re-export moved), breaking the
+# build. These two direct dependencies exist only to pin the exact
+# alpha.2 line the candidate was released with — itself a Phase 3
+# evaluation finding about the alpha line's instability.
+paillier-zk = "=0.7.0-alpha.2"
+cggmp24-keygen = "=0.7.0-alpha.2"
+
+[dev-dependencies]
+# Independent Ed25519 verifier used only by tests, to prove FROST group
+# signatures are standard Ed25519 signatures (as Solana/TON expect).
+ed25519-zebra = "4"
+# Independent ECDSA verifier used only by tests, to prove CGGMP-family
+# threshold signatures are standard secp256k1 ECDSA (as EVM chains expect).
+k256 = { version = "0.13", features = ["ecdsa"] }
+
+[lints]
+workspace = true
+

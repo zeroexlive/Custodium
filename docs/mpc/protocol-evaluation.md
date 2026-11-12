@@ -5,6 +5,15 @@ is approved for production signing.** Both candidates below are
 PENDING independent review. There is no production signing in
 Phase 1 or Phase 2.
 
+> **Phase 3 update (2026-11-12) — §2 is SUPERSEDED.** The executed
+> evaluation (`docs/mpc/phase-3-evaluation.md`) **rejects
+> `cggmp21`** as the ECDSA candidate (CVE-2025-66016 key
+> reconstruction in < 0.6.3; RUSTSEC-2025-0127 presignature forgery
+> unpatched in all cggmp21 versions) and evaluates its successor
+> `cggmp24` 0.7.0-alpha.2 instead. §3 (FROST) stands, with the
+> pinned version now `frost-ed25519` 3.0.0. Read §2 below as the
+> Phase 0 historical record only.
+
 ## 1. Scope and method
 
 Custodium needs two distinct signature families:
