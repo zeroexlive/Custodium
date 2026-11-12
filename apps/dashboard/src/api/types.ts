@@ -34,7 +34,22 @@ export interface DepositRecord {
   from_address: string; to_address: string; status: 'pending' | 'credited' | 'reorged_out';
   held: boolean; block_number: number; confirmations: number | null; confirmations_required: number;
 }
-export interface SweepDestinationEndpoint { endpoint_url: string; status?: string; updated_at?: string }
+export interface SweepDestinationEndpoint {
+  endpoint_url: string; url: string; enabled: boolean; version: number;
+  has_signing_secret: boolean; updated_by: string | null; updated_at?: string;
+}
+export interface SweepEndpointHistoryRow {
+  action: string; actor_id: string; previous_url_hash: string;
+  new_url_hash: string; created_at: string;
+}
+/** Sweeps (Phase 10). The destination comes only from the snapshot. */
+export interface Sweep {
+  id: string; wallet_id: string; network: string; asset: string;
+  status: string; status_reason: string; amount: string | null;
+  destination_address: string | null; approvals_required: number;
+  approvals_received: number; chain_tx_hash: string;
+  external_reference: string; created_at: string;
+}
 export interface Paginated<T> { items: T[]; total?: number }
 
 /** Wallets (Phase 2). A wallet stays `provisioning` until MPC key generation

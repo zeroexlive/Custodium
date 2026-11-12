@@ -1,7 +1,7 @@
 import type {
   ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, Network, Organization, Project,
-  ProjectBalances, SweepDestinationEndpoint, TransactionLookup, DepositRecord, User, Wallet,
+  ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
   WalletAddress, WalletBalances, WithdrawalPolicy, WithdrawalRequest,
 } from './types'
 
@@ -150,10 +150,24 @@ export const api = {
     return request<BlacklistCheckResult>('GET', `/blacklist/check?${query.toString()}`)
   },
 
-  // Sweep destination resolver endpoint
-  getSweepEndpoint: () => request<SweepDestinationEndpoint>('GET', '/sweep-destination-endpoint'),
-  putSweepEndpoint: (endpoint_url: string) =>
-    request<SweepDestinationEndpoint>('PUT', '/sweep-destination-endpoint', { endpoint_url }),
-  deleteSweepEndpoint: () => request<void>('DELETE', '/sweep-destination-endpoint'),
+  // Sweep destination resolver endpoint (Phase 10)
+  getSweepEndpoint: (projectId: string) =>
+    request<SweepDestinationEndpoint>('GET', `/sweep-destination-endpoint?project_id=${encodeURIComponent(projectId)}`),
+  putSweepEndpoint: (projectId: string, endpoint_url: string, signing_secret = '') =>
+    request<SweepDestinationEndpoint>('PUT', '/sweep-destination-endpoint', { project_id: projectId, endpoint_url, signing_secret }),
+  deleteSweepEndpoint: (projectId: string) =>
+    request<SweepDestinationEndpoint>('DELETE', `/sweep-destination-endpoint?project_id=${encodeURIComponent(projectId)}`),
+  getSweepEndpointHistory: async (projectId: string) =>
+    listOf(await request<SweepEndpointHistoryRow[] | { items: SweepEndpointHistoryRow[] }>('GET', `/sweep-destination-endpoint/history?project_id=${encodeURIComponent(projectId)}`)),
+  testSweepEndpoint: (projectId: string, network: string) =>
+    request<{ address: string; normalized: string; network: string }>('POST', '/sweep-destination-endpoint/test', { project_id: projectId, network }),
+
+  // Sweeps (Phase 10) — requests never carry a destination.
+  listSweeps: async (projectId: string) =>
+    listOf(await request<Sweep[] | { items: Sweep[] }>('GET', `/sweeps?project_id=${encodeURIComponent(projectId)}`)),
+  createSweep: (payload: { wallet_id: string; network: string; asset_id: string }, idempotencyKey: string) =>
+    request<Sweep>('POST', '/sweeps', payload, { 'Idempotency-Key': idempotencyKey }),
+  approveSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/approve`, { note: '' }),
+  rejectSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/reject`, { note: '' }),
 }
 export type Api = typeof api

@@ -65,8 +65,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
 | 7 | Solana | Implemented — merged to `main` 2026-11-12 (PR #8, merge `1dae8c9`); live-cluster verification NOT done (sandbox egress; see history) |
 | 8 | TON | Implemented — merged to `main` 2026-11-12 (PR #9, merge `7800470`); differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
-| 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented 2026-11-12 — withdrawal lifecycle + policy engine + fee accounting + reconciliation halts + refunds/exports; live-testnet soak NOT done (egress; see history) |
-| 10 | Sweeping & Treasury | Planned |
+| 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented — merged to `main` 2026-11-12 (PR #10, merge `4eacf6a`); live-testnet soak NOT done (egress; see history) |
+| 10 | Sweeping & Treasury | Implemented 2026-11-12 — resolver-endpoint rule enforced end to end (SSRF defences, immutable snapshots, 422 destination rejection); live tenant-endpoint interop NOT verified (egress; see history) |
 | 11 | SaaS Product Completion | Planned |
 | 12 | Hardening & Production Preparation | Planned |
 
@@ -731,6 +731,56 @@ Full record: `docs/architecture/phase-9-operations.md`.
   exit criterion; chain APIs unreachable from this sandbox),
   Temporal wiring (commands are the entrypoints), PostgreSQL,
   CI. Signing gate unchanged.
+- Outcome: the first snapshot push's approval expired
+  unapproved (30-minute window elapsed during the work); a
+  second attempt was approved and landed as branch commit
+  `f12ceac1eefb433b3e4686a60b71df9d49665f7e` (29 paths); PR
+  **#10** merged to `main`, merge commit
+  `4eacf6a6fc2476d45d384ff9a1ecc180abcb7d75`, verified via GitHub
+  API (main = [P9 merge, P9, P8 merge, ...]). Sync record
+  appended (10 entries). Local branches realigned; this note
+  rides the Phase 10 commit. Next: Phase 10 (Sweeping &
+  Treasury).
+
+### 2026-11-12 — Phase 10 COMPLETE (Sweeping & Treasury)
+Full record: `docs/architecture/phase-10-sweeps.md`.
+- **New module `waas/modules/sweeps/`** implementing the
+  normative resolver design (docs/api/sweep-resolver.md, ADR
+  0006) end to end, replacing the Phase 1 501 endpoint gates:
+  `SweepDestinationEndpoint` (PostgreSQL-only, one per project,
+  owner/administrator registration, Fernet-encrypted optional
+  signing secret, versioned) + append-only
+  `SweepEndpointHistory` (URL hashes, never values); **resolver
+  client** with the full SSRF matrix (HTTPS only, all DNS
+  answers must be public IPs incl. metadata ranges, no
+  redirects, ≤512-byte single-token plain-text body, per-network
+  address validation, bounded transport-only retries, HMAC
+  request signing when a secret is registered); **sweep
+  lifecycle** per the design state machine with
+  `ResolvedDestinationSnapshot` (immutable at the model layer),
+  blacklist/self-sweep/halt policy checks, threshold +
+  leave-behind amount discovery, Phase 9 quorum reuse, and
+  **no re-resolution after approval** — execution passes the
+  snapshot address through the shared
+  `operations.dispatch.execute_transfer` (extracted this phase);
+  `process_sweeps` worker command; resolution test tool that
+  stores nothing.
+- API: endpoint GET/PUT/DELETE + history + test; `POST /sweeps`
+  inspects the raw JSON — destination fields → 422
+  `destination_not_allowed`, unknown fields → 422 (closed
+  schema). Dashboard: endpoint view (project scope, test,
+  history) + real Sweeps view.
+- VERIFIED (actually run): backend `pytest` **154 passed, 1
+  skipped**; ruff clean; frontend typecheck + vitest (9) +
+  build green. Penetration-style tests cover the SSRF/format
+  matrix, snapshot immutability, destination substitution after
+  approval (endpoint switches address → approved sweep still
+  uses the snapshot), and exact ledger outcomes. One Phase 1
+  gate test updated (sweep gate now answers 422, not 501).
+- NOT verified: live tenant-endpoint interoperability (no
+  public-internet egress), socket-level DNS pinning (documented
+  as deployment layer), Temporal wiring, PostgreSQL, CI.
+  Signing gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

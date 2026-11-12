@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from ninja import NinjaAPI, Router
-from ninja.errors import HttpError
 
 from waas.api.authentication import AnyAuth, DashboardAuth
 from waas.modules.api_credentials.api.router import router as api_credentials_router
@@ -16,6 +15,8 @@ from waas.modules.operations.api.router import dashboard_router as operations_da
 from waas.modules.operations.api.router import router as operations_router
 from waas.modules.organizations.api.router import router as organizations_router
 from waas.modules.projects.api.router import router as projects_router
+from waas.modules.sweeps.api.router import dashboard_router as sweeps_dashboard_router
+from waas.modules.sweeps.api.router import router as sweeps_router
 from waas.modules.wallets.api.router import router as wallets_router
 
 # All APIs here authenticate with bearer tokens or HMAC signatures, never
@@ -37,6 +38,8 @@ api.add_router("", blacklist_router)
 api.add_router("", indexing_router)
 api.add_router("", operations_router)
 api.add_router("", operations_dashboard_router)
+api.add_router("", sweeps_router)
+api.add_router("", sweeps_dashboard_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but
@@ -46,21 +49,6 @@ api.add_router("", operations_dashboard_router)
 phase_router = Router(tags=["phase-gates"])
 any_auth = AnyAuth()
 dashboard_auth = DashboardAuth()
-
-
-@phase_router.get("/sweep-destination-endpoint", auth=dashboard_auth)
-def sweep_endpoint_get_not_implemented(request):
-    raise HttpError(501, "Sweep destination endpoint registration arrives in Phase 10.")
-
-
-@phase_router.put("/sweep-destination-endpoint", auth=dashboard_auth)
-def sweep_endpoint_put_not_implemented(request):
-    raise HttpError(501, "Sweep destination endpoint registration arrives in Phase 10.")
-
-
-@phase_router.delete("/sweep-destination-endpoint", auth=dashboard_auth)
-def sweep_endpoint_delete_not_implemented(request):
-    raise HttpError(501, "Sweep destination endpoint registration arrives in Phase 10.")
 
 
 api.add_router("", phase_router)

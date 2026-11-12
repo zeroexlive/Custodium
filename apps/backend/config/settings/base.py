@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "waas.modules.solana",
     "waas.modules.ton",
     "waas.modules.operations",
+    "waas.modules.sweeps",
 ]
 
 MIDDLEWARE = [
