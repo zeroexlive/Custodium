@@ -68,7 +68,7 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented — merged to `main` 2026-11-12 (PR #10, merge `4eacf6a`); live-testnet soak NOT done (egress; see history) |
 | 10 | Sweeping & Treasury | Implemented — merged to `main` 2026-11-12 (PR #11, merge `0a7b7fb`); live tenant-endpoint interop NOT verified (egress; see history) |
 | 11 | SaaS Product Completion | Implemented — merged to `main` 2026-11-12 (PR #12, merge `824ddd7`); live webhook delivery NOT verified (egress; see history) |
-| 12 | Hardening & Production Preparation | Preparation scope implemented 2026-11-12 — DB append-only triggers, platform kill switch, probes, runbooks, readiness assessment. **Custodium is NOT Production Approved** (independent review/pentest/legal/soaks open; see history) |
+| 12 | Hardening & Production Preparation | Preparation scope implemented — merged to `main` 2026-11-12 (PR #13, merge `878fa4f`). **Custodium is NOT Production Approved** (independent review/pentest/legal/soaks open; see history) |
 
 ## Environment notes (this dev VM, 2026-11-12)
 
@@ -874,6 +874,18 @@ a separate written approval decision; neither exists.
   the 13-phase roadmap: all phases 0–12 are implemented and
   merged to `main`; what remains is evidence and approvals,
   not features.
+- Outcome: snapshot push (16 paths) landed as branch commit
+  `958b2fb3eea8d04030c0e03ffdea1d3be443f4df`; PR **#13** merged
+  to `main`, merge commit `878fa4f33bf2f5f4fe09113e2b3178a97910661b`,
+  verified via GitHub API (main = [P12 merge, P12, P11 merge,
+  ...]). Sync record appended (13 entries — one per phase).
+  Local branches realigned. **The 13-phase roadmap is
+  complete.** Remaining work is external evidence and
+  approvals (see the readiness assessment), plus the standing
+  item: this closing note is an uncommitted local edit of this
+  file — the repository on GitHub records Phase 12 through the
+  phase-12-hardening document; any future commit should carry
+  this note.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,
