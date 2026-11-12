@@ -59,6 +59,7 @@ def test_phase_gates_return_501(client: Client, seeded: str) -> None:
         "/api/v1/transactions/lookup?network=ethereum&hash=0xabc", **auth_headers(seeded)
     )
     assert lookup.status_code == 422
-    # The sweep gate (Phase 10) still honestly 501s.
+    # The sweep gate landed in Phase 10: it answers for real (422
+    # here — a project_id is required) instead of the Phase 1 501.
     sweep = client.get("/api/v1/sweep-destination-endpoint", **auth_headers(seeded))
-    assert sweep.status_code == 501
+    assert sweep.status_code == 422

@@ -75,18 +75,29 @@ class Factories:
 DEFAULT_FACTORIES = Factories()
 
 
-def execute(request, *, factories: Factories = DEFAULT_FACTORIES):
-    """Run the family pipeline for an approved request; returns
-    the chain transaction row."""
-    family = family_of(request.network)
-    provider = factories.provider(request.network)
+def execute_transfer(
+    *,
+    wallet,
+    network: BlockchainNetwork,
+    asset,
+    to_address: str,
+    amount: int,
+    idempotency_key: str,
+    factories: Factories = DEFAULT_FACTORIES,
+):
+    """Run the family pipeline for one transfer; returns the
+    chain transaction row. Shared by withdrawal dispatch
+    (Phase 9) and sweeps (Phase 10) so both inherit identical
+    chain safety (blacklist, signer gates, reservations)."""
+    family = family_of(network)
+    provider = factories.provider(network)
     kwargs = {
-        "wallet": request.wallet,
-        "network": request.network,
-        "asset": request.asset,
-        "to_address": request.destination_address,
-        "amount": int(request.amount),
-        "idempotency_key": f"wd:{request.id}",
+        "wallet": wallet,
+        "network": network,
+        "asset": asset,
+        "to_address": to_address,
+        "amount": amount,
+        "idempotency_key": idempotency_key,
         "provider": provider,
     }
     if family == "evm":
@@ -96,6 +107,20 @@ def execute(request, *, factories: Factories = DEFAULT_FACTORIES):
     if family == "solana":
         return solana_service.execute_withdrawal(signer=factories.ed25519_signer(), **kwargs)
     return ton_service.execute_withdrawal(signer=factories.ed25519_signer(), **kwargs)
+
+
+def execute(request, *, factories: Factories = DEFAULT_FACTORIES):
+    """Run the family pipeline for an approved withdrawal
+    request; returns the chain transaction row."""
+    return execute_transfer(
+        wallet=request.wallet,
+        network=request.network,
+        asset=request.asset,
+        to_address=request.destination_address,
+        amount=int(request.amount),
+        idempotency_key=f"wd:{request.id}",
+        factories=factories,
+    )
 
 
 def confirm(chain_tx, *, network: BlockchainNetwork, factories: Factories = DEFAULT_FACTORIES):

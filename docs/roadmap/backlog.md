@@ -285,7 +285,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 10 — Sweeping and Treasury
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/architecture/phase-10-sweeps.md` (live tenant-endpoint
+  interoperability remains open: no public-internet egress from
+  the build sandbox).
 - **Goal:** Automated sweeping to tenant treasury destinations —
   obtained ONLY via the registered resolver (ADR 0006).
 
