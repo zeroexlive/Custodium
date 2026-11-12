@@ -273,10 +273,14 @@ def confirm_transaction(
             )
         return tx
     tx.block_number = int(receipt["blockNumber"], 16)
+    gas_used = receipt.get("gasUsed")
+    gas_price = receipt.get("effectiveGasPrice")
+    if gas_used is not None and gas_price is not None:
+        tx.fee_wei = int(gas_used, 16) * int(gas_price, 16)
     confirmations = provider.block_number() - tx.block_number + 1
     required = max(tx.network.confirmations_required, 1)
     if confirmations < required:
-        tx.save(update_fields=["block_number", "updated_at"])
+        tx.save(update_fields=["block_number", "fee_wei", "updated_at"])
         return tx
     if tx.reservation is not None:
         ledger_services.settle_reservation(
@@ -284,5 +288,5 @@ def confirm_transaction(
             idempotency_key=f"{tx.idempotency_key}:settle",
         )
     tx.status = EvmTransaction.Status.CONFIRMED
-    tx.save(update_fields=["status", "block_number", "updated_at"])
+    tx.save(update_fields=["status", "block_number", "fee_wei", "updated_at"])
     return tx

@@ -64,8 +64,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
 | 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
 | 7 | Solana | Implemented — merged to `main` 2026-11-12 (PR #8, merge `1dae8c9`); live-cluster verification NOT done (sandbox egress; see history) |
-| 8 | TON | Implemented 2026-11-12 — cells/BoC, wallet v4r2, jettons, per-account indexing; differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
-| 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Planned |
+| 8 | TON | Implemented — merged to `main` 2026-11-12 (PR #9, merge `7800470`); differentially verified vs @ton/ton + tonsdk; live-network verification NOT done (egress; see history) |
+| 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Implemented 2026-11-12 — withdrawal lifecycle + policy engine + fee accounting + reconciliation halts + refunds/exports; live-testnet soak NOT done (egress; see history) |
 | 10 | Sweeping & Treasury | Planned |
 | 11 | SaaS Product Completion | Planned |
 | 12 | Hardening & Production Preparation | Planned |
@@ -684,6 +684,53 @@ Full record: `docs/blockchains/ton-implementation.md`.
   double + differential proofs), Wallet V5, outbound-Jetton
   bounce-completion tracking (Phase 12). Signing gate unchanged.
   All five chains are now implemented; next is Phase 9.
+- Outcome: first snapshot push was interrupted by a service
+  restart — verified via the API that the branch was unchanged
+  (still at the Phase 7 commit) before retrying; the retry
+  (21 paths) landed as branch commit
+  `6fbe5e2ec8c2c6d40048f447dcb4f62d8c28c55c`; PR **#9** merged to
+  `main`, merge commit `78004700c9837d99ccb2530b836da6746f6bdaef`,
+  verified via GitHub API (main = [P8 merge, P8, P7 merge, ...]).
+  Sync record appended (9 entries). Local branches realigned;
+  this note rides the Phase 9 commit. Next: Phase 9 (Financial
+  Operations).
+
+### 2026-11-12 — Phase 9 COMPLETE (Financial Operations)
+Full record: `docs/architecture/phase-9-operations.md`.
+- **New module `waas/modules/operations/`**: `WithdrawalRequest`
+  implementing the design status machine (pending_policy →
+  approved → signing → broadcast → confirming → completed |
+  failed | rejected); **policy engine** (`WithdrawalPolicy`:
+  asset row > project default > platform default; hard
+  max-single + daily-velocity limits reject with reason;
+  approvals_required with auto-approve threshold); **approvals**
+  with roles (owner/administrator/withdrawal_approver),
+  maker-checker, one decision per approver, one rejection final;
+  **service-fee accounting** (flat fee journaled at dispatch,
+  reversed via the ledger if the payout fails — fee income never
+  survives a failed withdrawal); **actual network fee** reported
+  on completion (new captures: EVM fee_wei from the receipt,
+  Solana meta.fee; TRON/TON already carried theirs);
+  **reconciliation halts** (`run_reconciliation` raises/clears
+  fail-closed halts from the Phase 5 report; creation + dispatch
+  refuse while halted); **refund playbook** (ADJUSTMENT journal
+  with mandatory reason, cumulative cap); **CSV journal export**;
+  worker commands `process_withdrawals` / `run_reconciliation`;
+  dispatch adapter over the five chain pipelines with
+  fail-closed production signer factories and an exception
+  safety net so one request cannot crash the batch.
+- API: POST/GET /withdrawals (+ Idempotency-Key contract),
+  approve/reject/refund, policy GET/PUT, journal export;
+  dashboard Withdrawals view + policy editor.
+- VERIFIED (actually run): backend `pytest` **148 passed, 1
+  skipped**; ruff clean; frontend typecheck + vitest (9) +
+  build green. Includes an end-to-end API test (HMAC creation →
+  dashboard approval) and a full EVM dispatch cycle against the
+  provider double with exact fee/reservation balances.
+- NOT verified: the live-testnet reconciliation soak (backlog
+  exit criterion; chain APIs unreachable from this sandbox),
+  Temporal wiring (commands are the entrypoints), PostgreSQL,
+  CI. Signing gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,

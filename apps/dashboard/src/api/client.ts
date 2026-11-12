@@ -2,7 +2,7 @@ import type {
   ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, Network, Organization, Project,
   ProjectBalances, SweepDestinationEndpoint, TransactionLookup, DepositRecord, User, Wallet,
-  WalletAddress, WalletBalances,
+  WalletAddress, WalletBalances, WithdrawalPolicy, WithdrawalRequest,
 } from './types'
 
 export class ApiError extends Error {
@@ -23,8 +23,8 @@ export function setAuthToken(token: string | null): void { authToken = token }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
-async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+async function request<T>(method: Method, path: string, body?: unknown, extraHeaders?: Record<string, string>): Promise<T> {
+  const headers: Record<string, string> = { Accept: 'application/json', ...(extraHeaders ?? {}) }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (authToken) headers.Authorization = `Bearer ${authToken}`
   let response: Response
@@ -113,6 +113,27 @@ export const api = {
     request<ProjectBalances>('GET', `/projects/${encodeURIComponent(projectId)}/balances`),
   getWalletBalances: (walletId: string) =>
     request<WalletBalances>('GET', `/wallets/${encodeURIComponent(walletId)}/balances`),
+
+  // Financial operations — withdrawal requests and policy (Phase 9).
+  listWithdrawals: async (projectId: string) =>
+    listOf(await request<WithdrawalRequest[] | { items: WithdrawalRequest[] }>('GET', `/withdrawals?project_id=${encodeURIComponent(projectId)}`)),
+  createWithdrawal: (payload: {
+    wallet_id: string; network: string; asset_id: string;
+    destination_address: string; amount: string; external_reference?: string;
+  }, idempotencyKey: string) =>
+    request<WithdrawalRequest>('POST', '/withdrawals', payload, { 'Idempotency-Key': idempotencyKey }),
+  approveWithdrawal: (id: string) =>
+    request<WithdrawalRequest>('POST', `/withdrawals/${encodeURIComponent(id)}/approve`, { note: '' }),
+  rejectWithdrawal: (id: string) =>
+    request<WithdrawalRequest>('POST', `/withdrawals/${encodeURIComponent(id)}/reject`, { note: '' }),
+  refundWithdrawal: (id: string, amount: string, reason: string) =>
+    request<WithdrawalRequest>('POST', `/withdrawals/${encodeURIComponent(id)}/refund`, { amount, reason }),
+  getWithdrawalPolicy: (projectId: string) =>
+    request<WithdrawalPolicy>('GET', `/projects/${encodeURIComponent(projectId)}/withdrawal-policy`),
+  updateWithdrawalPolicy: (projectId: string, payload: {
+    approvals_required: number; max_single_amount?: string | null; daily_limit?: string | null;
+    auto_approve_below: string; service_fee_flat: string;
+  }) => request<WithdrawalPolicy>('PUT', `/projects/${encodeURIComponent(projectId)}/withdrawal-policy`, payload),
 
   // Manual blacklist — a manually curated list only, not an AML/KYT system.
   listBlacklistEntries: async (organizationId: string): Promise<BlacklistEntry[]> =>

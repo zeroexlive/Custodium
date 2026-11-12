@@ -12,6 +12,8 @@ from waas.modules.identity.api.router import router as identity_router
 from waas.modules.indexing.api.router import router as indexing_router
 from waas.modules.ledger.api.router import router as ledger_router
 from waas.modules.networks.api.router import router as networks_router
+from waas.modules.operations.api.router import dashboard_router as operations_dashboard_router
+from waas.modules.operations.api.router import router as operations_router
 from waas.modules.organizations.api.router import router as organizations_router
 from waas.modules.projects.api.router import router as projects_router
 from waas.modules.wallets.api.router import router as wallets_router
@@ -33,6 +35,8 @@ api.add_router("", wallets_router)
 api.add_router("", ledger_router)
 api.add_router("", blacklist_router)
 api.add_router("", indexing_router)
+api.add_router("", operations_router)
+api.add_router("", operations_dashboard_router)
 
 # ---------------------------------------------------------------------------
 # Phase gates: endpoints whose contracts exist in the dashboard/API design but

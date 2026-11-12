@@ -90,6 +90,17 @@ class SolanaProvider:
         )
         return result if isinstance(result, dict) else None
 
+    def get_transaction_fee(self, signature: str) -> int | None:
+        """The network fee (lamports) of a landed transaction."""
+        result = self._call(
+            "getTransaction",
+            [signature, {"encoding": "json", "maxSupportedTransactionVersion": 0}],
+        )
+        if isinstance(result, dict) and isinstance(result.get("meta"), dict):
+            fee = result["meta"].get("fee")
+            return int(fee) if fee is not None else None
+        return None
+
     def get_signature_status(self, signature: str) -> dict | None:
         result = self._call(
             "getSignatureStatuses", [[signature], {"searchTransactionHistory": True}]

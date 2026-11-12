@@ -76,3 +76,21 @@ export interface BlacklistEntry {
 export interface BlacklistCheckResult {
   blacklisted: boolean; matched_scopes: BlacklistScope[]; network: string;
 }
+
+/** Withdrawal operations (Phase 9). Amounts are integer base-unit strings. */
+export interface WithdrawalRequest {
+  id: string; wallet_id: string; network: string; asset: string;
+  destination_address: string; amount: string; status: string;
+  status_reason: string; external_reference: string;
+  approvals_required: number; approvals_received: number;
+  service_fee: string; actual_fee: string | null; fee_asset: string | null;
+  chain_tx_hash: string; refunded_amount: string; created_at: string;
+}
+
+export interface WithdrawalPolicy {
+  approvals_required: number;
+  max_single_amount: string | null;
+  daily_limit: string | null;
+  auto_approve_below: string;
+  service_fee_flat: string;
+}
