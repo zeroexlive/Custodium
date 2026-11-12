@@ -126,7 +126,7 @@ single-server setup step by step, with confirmations:
 ```bash
 git clone https://github.com/zeroexlive/Custodium.git
 cd Custodium
-./scripts/install.sh            # --dry-run previews, --yes accepts defaults
+bash scripts/install.sh         # --dry-run previews, --yes accepts defaults
 ```
 
 Tutorial: [`docs/operations/deployment-1-server-dev.md`](docs/operations/deployment-1-server-dev.md).

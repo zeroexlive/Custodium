@@ -8,8 +8,9 @@ the wrong one for real-value custody (see *Limitations* below).
 
 Two ways to run it:
 
-- **Automated:** `scripts/install.sh` — an interactive, step-by-step
-  installer that performs this whole tutorial with confirmations.
+- **Automated:** `bash scripts/install.sh` — an interactive,
+  step-by-step installer that performs this whole tutorial with
+  confirmations.
 - **Manual:** the steps below (identical outcome).
 
 ## Prerequisites
