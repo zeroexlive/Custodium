@@ -2,7 +2,8 @@ import type {
   ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, Network, Organization, Project,
   ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
-  WalletAddress, WalletBalances, WithdrawalPolicy, WithdrawalRequest,
+  Invoice, OrgMember, Plan, UsageSnapshot, WalletAddress, WalletBalances,
+  WebhookDelivery, WebhookEndpoint, WebhookEndpointCreated, WithdrawalPolicy, WithdrawalRequest,
 } from './types'
 
 export class ApiError extends Error {
@@ -169,5 +170,38 @@ export const api = {
     request<Sweep>('POST', '/sweeps', payload, { 'Idempotency-Key': idempotencyKey }),
   approveSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/approve`, { note: '' }),
   rejectSweep: (id: string) => request<Sweep>('POST', `/sweeps/${encodeURIComponent(id)}/reject`, { note: '' }),
+
+  // Webhooks (Phase 11)
+  listWebhookEndpoints: async (projectId: string) =>
+    listOf(await request<WebhookEndpoint[] | { items: WebhookEndpoint[] }>('GET', `/webhooks/endpoints?project_id=${encodeURIComponent(projectId)}`)),
+  createWebhookEndpoint: (projectId: string, url: string, events: string[]) =>
+    request<WebhookEndpointCreated>('POST', '/webhooks/endpoints', { project_id: projectId, url, events }),
+  disableWebhookEndpoint: (id: string) =>
+    request<WebhookEndpoint>('DELETE', `/webhooks/endpoints/${encodeURIComponent(id)}`),
+  listWebhookDeliveries: async (projectId: string) =>
+    listOf(await request<WebhookDelivery[] | { items: WebhookDelivery[] }>('GET', `/webhooks/deliveries?project_id=${encodeURIComponent(projectId)}`)),
+  replayWebhookDelivery: (id: string) =>
+    request<{ id: string; status: string }>('POST', `/webhooks/deliveries/${encodeURIComponent(id)}/replay`),
+
+  // Plans & billing (Phase 11)
+  listPlans: async () => listOf(await request<Plan[] | { items: Plan[] }>('GET', '/plans')),
+  getUsage: (organizationId: string) =>
+    request<UsageSnapshot>('GET', `/organizations/${encodeURIComponent(organizationId)}/usage`),
+  setSubscription: (organizationId: string, planSlug: string) =>
+    request<{ plan: string; status: string }>('POST', `/organizations/${encodeURIComponent(organizationId)}/subscription`, { plan_slug: planSlug }),
+  listInvoices: async (organizationId: string) =>
+    listOf(await request<Invoice[] | { items: Invoice[] }>('GET', `/organizations/${encodeURIComponent(organizationId)}/invoices`)),
+  markInvoicePaid: (invoiceId: string) =>
+    request<{ id: string; status: string }>('POST', `/invoices/${encodeURIComponent(invoiceId)}/mark-paid`),
+
+  // Team management (Phase 11)
+  listMembers: async (organizationId: string) =>
+    listOf(await request<OrgMember[] | { items: OrgMember[] }>('GET', `/organizations/${encodeURIComponent(organizationId)}/members`)),
+  addMember: (organizationId: string, email: string, role: string) =>
+    request<OrgMember>('POST', `/organizations/${encodeURIComponent(organizationId)}/members`, { email, role }),
+  updateMemberRole: (organizationId: string, membershipId: string, role: string) =>
+    request<OrgMember>('PATCH', `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(membershipId)}`, { role }),
+  removeMember: (organizationId: string, membershipId: string) =>
+    request<{ removed: string }>('DELETE', `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(membershipId)}`),
 }
 export type Api = typeof api

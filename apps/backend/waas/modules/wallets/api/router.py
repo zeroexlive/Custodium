@@ -47,6 +47,12 @@ def create_wallet(
         existing = Wallet.objects.filter(project=project, idempotency_key=idempotency_key).first()
         if existing is not None:
             return Status(200, wallet_out(existing))
+    from waas.modules.plans import services as plan_services
+
+    try:
+        plan_services.check_wallet_quota(project)
+    except plan_services.QuotaExceeded as exc:
+        raise HttpError(403, str(exc)) from exc
     wallet = Wallet.objects.create(
         project=project,
         label=label,

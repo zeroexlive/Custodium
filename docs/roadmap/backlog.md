@@ -313,7 +313,10 @@ Rules for the taxonomy:
 ---
 
 ## Phase 11 — SaaS Completion
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/architecture/phase-11-saas.md` (live webhook delivery and
+  a deployed fresh-tenant walkthrough remain operational
+  validations; payment collection intentionally off-platform).
 - **Goal:** The commercial SaaS surface around the custody core.
 
 ### Tasks

@@ -109,3 +109,39 @@ export interface WithdrawalPolicy {
   auto_approve_below: string;
   service_fee_flat: string;
 }
+
+/** Webhooks (Phase 11). */
+export interface WebhookEndpoint {
+  id: string; url: string; events: string[]; enabled: boolean; created_at: string;
+}
+export interface WebhookEndpointCreated extends WebhookEndpoint { signing_secret: string }
+export interface WebhookDelivery {
+  id: string; event_id: string; event_type: string; endpoint_url: string;
+  status: string; attempts: number; last_status_code: number | null;
+  last_error: string; next_attempt_at: string | null; delivered_at: string | null;
+}
+export const WEBHOOK_EVENT_TYPES = [
+  'deposit.credited', 'withdrawal.completed', 'withdrawal.failed',
+  'sweep.completed', 'sweep.failed',
+] as const
+
+/** Plans & billing (Phase 11, fiat only). */
+export interface Plan {
+  slug: string; name: string; monthly_price_cents: number;
+  quotas: Record<string, number>;
+}
+export interface UsageSnapshot {
+  plan: string; period_start: string; period_end: string;
+  wallets: { used: number; limit: number };
+  api_keys: { used: number; limit: number };
+  withdrawals_this_period: { used: number; included: number };
+}
+export interface Invoice {
+  id: string; period_start: string; period_end: string;
+  line_items: { label: string; quantity: number; unit_cents: number; amount_cents: number }[];
+  total_cents: number; currency: string; status: string;
+}
+/** Team management (Phase 11). */
+export interface OrgMember {
+  membership_id: string; user_id: string; email: string; role: string; created_at: string;
+}

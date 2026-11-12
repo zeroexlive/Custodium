@@ -216,7 +216,29 @@ def _fail(sweep: Sweep, status: str, reason: str) -> Sweep:
     sweep.status = status
     sweep.status_reason = reason[:500]
     sweep.save(update_fields=["status", "status_reason", "updated_at"])
+    if status == Sweep.Status.FAILED:
+        _emit_sweep_terminal(sweep)
     return sweep
+
+
+def _emit_sweep_terminal(sweep: Sweep) -> None:
+    from waas.modules.webhooks import services as webhook_services
+
+    snapshot = ResolvedDestinationSnapshot.objects.filter(sweep=sweep).first()
+    webhook_services.emit_event(
+        project=sweep.project,
+        event_type=f"sweep.{sweep.status}",
+        data={
+            "sweep_id": str(sweep.id),
+            "wallet_id": str(sweep.wallet_id),
+            "network": sweep.network.slug,
+            "asset": sweep.asset.symbol,
+            "amount": str(int(sweep.amount)) if sweep.amount is not None else None,
+            "destination_address": snapshot.destination_address if snapshot else None,
+            "tx_hash": sweep.chain_tx_hash,
+            "status_reason": sweep.status_reason,
+        },
+    )
 
 
 @transaction.atomic
@@ -307,6 +329,7 @@ def process_sweep(
             sweep.status = Sweep.Status.COMPLETED
             sweep.status_reason = "below threshold: nothing to sweep"
             sweep.save(update_fields=["amount", "status", "status_reason", "updated_at"])
+            _emit_sweep_terminal(sweep)
             return sweep
         sweep.amount = sweepable
         # Business quorum from the Phase 9 policy, if any.
@@ -387,6 +410,8 @@ def _execute_sweep(
             "destination": snapshot.destination_address, "status": sweep.status,
         },
     )
+    if sweep.status in (Sweep.Status.COMPLETED, Sweep.Status.FAILED):
+        _emit_sweep_terminal(sweep)
     return sweep
 
 
@@ -414,6 +439,8 @@ def refresh_sweep(
     else:
         sweep.status = Sweep.Status.CONFIRMING
     sweep.save(update_fields=["chain_tx_hash", "status", "status_reason", "updated_at"])
+    if sweep.status in (Sweep.Status.COMPLETED, Sweep.Status.FAILED):
+        _emit_sweep_terminal(sweep)
     return sweep
 
 

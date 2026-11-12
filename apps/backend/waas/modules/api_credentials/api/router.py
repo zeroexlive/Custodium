@@ -53,6 +53,12 @@ def create_api_key(request, payload: ApiKeyIn):
     name = payload.name.strip()
     if not name:
         raise HttpError(422, "API key name is required")
+    from waas.modules.plans import services as plan_services
+
+    try:
+        plan_services.check_api_key_quota(project)
+    except plan_services.QuotaExceeded as exc:
+        raise HttpError(403, str(exc)) from exc
     key, secret = _create_key(project, request.auth, name, payload.scopes)
     AuditEvent.record(
         "api_key.created", actor_user=request.auth,
