@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "waas.modules.evm",
     "waas.modules.indexing",
     "waas.modules.tron",
+    "waas.modules.solana",
 ]
 
 MIDDLEWARE = [
@@ -129,3 +130,6 @@ LOGGING = {
 # TRON node endpoints per network slug (TronGrid-style HTTP API).
 TRON_API_ENDPOINTS: dict[str, list[str]] = {}
 TRON_API_KEY = ""
+
+# Solana RPC endpoints per network slug.
+SOLANA_RPC_ENDPOINTS: dict[str, list[str]] = {}

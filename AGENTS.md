@@ -62,8 +62,8 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
 | 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
 | 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
-| 6 | TRON | Implemented 2026-11-12 — addresses, protobuf builders, provider, pipeline, indexing; live-node verification NOT done (sandbox egress; see history) |
-| 7 | Solana | Planned |
+| 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
+| 7 | Solana | Implemented 2026-11-12 — Ed25519 port, message compiler, ATA, balance-delta indexing; live-cluster verification NOT done (sandbox egress; see history) |
 | 8 | TON | Planned |
 | 9 | Financial Operations (deposits, withdrawals, ledger, webhooks) | Planned |
 | 10 | Sweeping & Treasury | Planned |
@@ -601,6 +601,47 @@ Full record: `docs/blockchains/tron-implementation.md`.
   the provider double), broadcast-JSON acceptance by a live node,
   recovery-id convention against java-tron, energy/bandwidth
   estimation & delegation, TRC-10. Signing gate unchanged.
+- Outcome: snapshot push (21 paths) → branch commit
+  `34ae02901dc1d946dfe54d563b11baf8d00417d8`; PR **#7** merged to
+  `main`, merge commit `3f68a35d57e963d37a6803db3cf283e21289fecf`,
+  verified via GitHub API (main = [P6 merge, P6, P5 merge, ...]).
+  Sync record appended (7 entries). Local branches realigned; this
+  note rides the Phase 7 commit. Next: Phase 7 (Solana).
+
+### 2026-11-12 — Phase 7 COMPLETE (Solana)
+Full record: `docs/blockchains/solana-implementation.md`.
+- **New module `waas/modules/solana/`** (`solana`, `solana-devnet`;
+  32-slot registry policy): base58 + Ed25519 address handling;
+  **Ed25519 signer port** (whole-message; only fail-closed impl
+  wired — FROST stays inside its Phase 3 ciphersuite and behind
+  the review gate); legacy **message compiler** (shortvec,
+  account-key dedup/order, header derivation) with SystemProgram
+  transfer, SPL **TransferChecked**, ATA **create-idempotent**;
+  **ATA/PDA derivation** with a from-the-equation Ed25519
+  on-curve test (exact edge vectors: base point, (0,−1) ± sign,
+  y ≥ p); JSON-RPC provider (failover, jsonParsed blocks);
+  withdrawal pipeline with platform semantics (SPL = ATA-create +
+  ATA→ATA TransferChecked, rent borne by the wallet fee payer);
+  **balance-delta slot scanner** per the Phase 0 design §5.3
+  (SOL pre/post balances; SPL pre/post token balances attributed
+  by token-account OWNER; skipped slots handled; reorg walk-back
+  anchored on real blocks). Lookup no longer lowercases base58
+  hashes; reconciliation covers Solana withdrawals.
+- **Cross-family bug the Solana reorg test caught**:
+  `indexing._record_deposit` lowercased stored hashes/addresses —
+  fine for hex, corrupting for base58; a Solana reorg orphaned
+  the block but matched zero deposits to reverse (silent). Fixed
+  at the root: scanners canonicalise, the recorder stores as
+  given. Also fixed slot-0 falsy collapse in confirmation.
+- VERIFIED (actually run): backend `pytest` **126 passed, 1
+  skipped** (full suite incl. all prior phases after the shared
+  recorder fix); ruff clean. Compilation parsed back byte-exact
+  in tests; the pipeline's wire transaction signature **verifies
+  with a standard Ed25519 implementation** against the wallet
+  key; deposits/withdrawals/reorg vs an in-memory RPC double.
+- NOT verified: live cluster/devnet round-trip (egress; exit
+  criterion met against the double only), Token-2022, priority
+  fees, ATA acceptance by a live cluster. Signing gate unchanged.
 
 ### 2026-11-12 — Phase 1 verification re-run (dashboard build now verified)
 - Re-verified 2026-11-12 ~15:52 local (12:22 UTC), on `wip-phase-0-phase-1`,
