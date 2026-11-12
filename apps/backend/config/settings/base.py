@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "waas.modules.blacklist",
     "waas.modules.evm",
     "waas.modules.indexing",
+    "waas.modules.tron",
 ]
 
 MIDDLEWARE = [
@@ -124,3 +125,7 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json-ish"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
 }
+
+# TRON node endpoints per network slug (TronGrid-style HTTP API).
+TRON_API_ENDPOINTS: dict[str, list[str]] = {}
+TRON_API_KEY = ""

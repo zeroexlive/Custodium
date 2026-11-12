@@ -13,6 +13,12 @@ from waas.modules.evm.chains import resolve_chain
 from waas.modules.evm.provider import EvmProvider
 from waas.modules.indexing import services
 from waas.modules.networks.models import BlockchainNetwork
+from waas.modules.tron.chains import TRON_NETWORK_SLUGS
+from waas.modules.tron.chains import resolve_chain as resolve_tron_chain
+from waas.modules.tron.indexing import scan_tron_once
+from waas.modules.tron.provider import TronProvider
+
+EVM_SLUGS = ["ethereum", "ethereum-sepolia", "bsc", "bsc-testnet"]
 
 
 class Command(BaseCommand):
@@ -34,16 +40,24 @@ class Command(BaseCommand):
                 raise CommandError(f"unknown network slug: {options['network']}")
         else:
             networks = list(
-                BlockchainNetwork.objects.filter(slug__in=["ethereum", "ethereum-sepolia", "bsc", "bsc-testnet"])
+                BlockchainNetwork.objects.filter(
+                    slug__in=EVM_SLUGS + sorted(TRON_NETWORK_SLUGS)
+                )
             )
         while True:
             all_caught_up = True
             for network in networks:
-                chain = resolve_chain(network)
-                provider = EvmProvider(chain)
-                report = services.scan_once(
-                    network=network, provider=provider, max_blocks=options["max_blocks"]
-                )
+                if network.slug in TRON_NETWORK_SLUGS:
+                    provider = TronProvider(resolve_tron_chain(network))
+                    report = scan_tron_once(
+                        network=network, provider=provider,
+                        max_blocks=options["max_blocks"],
+                    )
+                else:
+                    provider = EvmProvider(resolve_chain(network))
+                    report = services.scan_once(
+                        network=network, provider=provider, max_blocks=options["max_blocks"]
+                    )
                 self.stdout.write(
                     f"{report.network}: head={report.head} "
                     f"scanned={report.scanned_from}..{report.scanned_to} "

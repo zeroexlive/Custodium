@@ -374,6 +374,26 @@ def scan_once(
     )
 
 
+# -- shared lifecycle surface for other chain-family scanners ----
+# (Phase 6 TRON reuses the deposit lifecycle; family scanners adapt
+# their chain's blocks into these calls.)
+
+
+def record_deposit(**kwargs) -> bool:
+    """See `_record_deposit`."""
+    return _record_deposit(**kwargs)
+
+
+def reverse_deposit(deposit: ObservedDeposit) -> None:
+    """See `_reverse_deposit`."""
+    _reverse_deposit(deposit)
+
+
+def run_confirmation_pass(*, network: BlockchainNetwork, head: int) -> int:
+    """See `_confirmation_pass`."""
+    return _confirmation_pass(network, head)
+
+
 def reconciliation_report(*, network: BlockchainNetwork) -> dict:
     """Reconciliation for one network, per asset:
 
@@ -391,6 +411,7 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
 
     from waas.modules.evm.models import EvmTransaction
     from waas.modules.ledger.models import LedgerAccount
+    from waas.modules.tron.models import TronTransaction
 
     deposit_totals = {
         row["asset"]: int(row["total"] or 0)
@@ -399,14 +420,16 @@ def reconciliation_report(*, network: BlockchainNetwork) -> dict:
         .values("asset")
         .annotate(total=Sum("amount"))
     }
-    withdrawal_totals = {
-        row["asset"]: int(row["total"] or 0)
-        for row in EvmTransaction.objects.filter(
-            network=network, status=EvmTransaction.Status.CONFIRMED
-        )
-        .values("asset")
-        .annotate(total=Sum("amount"))
-    }
+    withdrawal_totals: dict = {}
+    for model in (EvmTransaction, TronTransaction):
+        for row in (
+            model.objects.filter(network=network, status=model.Status.CONFIRMED)
+            .values("asset")
+            .annotate(total=Sum("amount"))
+        ):
+            withdrawal_totals[row["asset"]] = withdrawal_totals.get(row["asset"], 0) + int(
+                row["total"] or 0
+            )
     rows = []
     for asset in Asset.objects.filter(network=network):
         ledger_custody = sum(

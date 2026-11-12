@@ -198,7 +198,9 @@ Rules for the taxonomy:
 ---
 
 ## Phase 6 — TRON
-- **Status:** Planned
+- **Status:** Implemented (2026-11-12) — see
+  `docs/blockchains/tron-implementation.md` (live-node verification
+  and the funded Nile round-trip remain open, as recorded there).
 - **Goal:** TRON support: TRX, USDT-TRC20, and TRC-20 tokens.
 
 ### Tasks

@@ -39,6 +39,7 @@ from waas.modules.indexing.models import ObservedDeposit
 from waas.modules.networks.models import BlockchainNetwork
 from waas.modules.organizations.models import Membership
 from waas.modules.projects.models import Project
+from waas.modules.tron.models import TronTransaction
 from waas.modules.wallets.models import Wallet
 
 router = Router(tags=["indexing"])
@@ -112,6 +113,14 @@ def _public_projection(network: BlockchainNetwork, tx_hash: str) -> dict | None:
         .select_related("asset")
         .first()
     )
+    if withdrawal is None:
+        tron_tx = (
+            TronTransaction.objects.filter(network=network, tx_id=tx_hash)
+            .select_related("asset")
+            .first()
+        )
+        if tron_tx is not None:
+            withdrawal = tron_tx
     if withdrawal is not None:
         return {
             "network": network.slug,
@@ -195,6 +204,14 @@ def _tenant_projection(
         .select_related("asset", "wallet")
         .first()
     )
+    if withdrawal is None:
+        withdrawal = (
+            TronTransaction.objects.filter(
+                network=network, tx_id=tx_hash, wallet__project__in=projects
+            )
+            .select_related("asset", "wallet")
+            .first()
+        )
     if withdrawal is not None:
         wallet = withdrawal.wallet
         return {
