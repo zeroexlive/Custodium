@@ -26,3 +26,43 @@ export interface TransactionLookup {
 }
 export interface SweepDestinationEndpoint { endpoint_url: string; status?: string; updated_at?: string }
 export interface Paginated<T> { items: T[]; total?: number }
+
+/** Wallets (Phase 2). A wallet stays `provisioning` until MPC key generation
+ *  completes in Phase 3 — the API refuses to activate it before then. */
+export type WalletStatus = 'provisioning' | 'active' | 'frozen' | 'archived'
+export interface Wallet {
+  id: string; project_id: string; label: string; external_customer_id: string;
+  wallet_type: string; status: WalletStatus;
+  key_generation: { ecdsa_key_ref: string | null; ed25519_key_ref: string | null };
+  policy_name: string; policy_version: string;
+  created_at?: string | null;
+}
+export interface WalletAddress {
+  id: string; wallet_id: string; network: string; address: string;
+  derivation_path: string; derivation_index: number;
+  memo: string | null; status: 'active' | 'disabled';
+  created_at?: string | null;
+}
+/** Ledger balances. All amounts are integer strings in base units — the
+ *  dashboard displays them raw and never converts them to floats. */
+export interface BalanceItem {
+  asset_id: string; symbol: string; network: string; decimals: number;
+  accounts: Record<string, string>;
+  available: string; reserved: string; pending: string;
+}
+export interface ProjectBalances { project_id: string; items: BalanceItem[]; total: number }
+export interface WalletBalances { wallet_id: string; items: BalanceItem[]; total: number }
+
+/** Manual blacklist (Phase 2) — a manually curated list maintained by
+ *  people. It is NOT an AML/KYT or risk-scoring system. */
+export type BlacklistScope = 'platform' | 'tenant'
+export interface BlacklistEntry {
+  id: string; scope: BlacklistScope;
+  organization_id: string | null; project_id: string | null;
+  network: string; address: string; normalized_address: string;
+  reason: string; active: boolean; effective: boolean;
+  expires_at: string | null; created_at?: string | null;
+}
+export interface BlacklistCheckResult {
+  blacklisted: boolean; matched_scopes: BlacklistScope[]; network: string;
+}
