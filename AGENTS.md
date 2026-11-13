@@ -37,6 +37,12 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
    HTTPS resolver endpoint (stored in PostgreSQL), which returns exactly one
    plain-text address. Never accept a destination in a sweep request, never
    read one from local files/config. Immutable snapshot per sweep, fail closed.
+   *Amendment (2026-11-13, William's explicit direction; ADR 0006 as
+   amended):* a project may instead run in STATIC destination mode, using a
+   tenant-registered static hot-wallet address per network (dashboard API,
+   owner/administrator, audited). Every other clause of this rule stands —
+   never in a request, never from files, snapshot before approval, fail
+   closed, no fallback between modes.
 5. **Manual blacklist only.** No AML/KYT/sanctions/risk-scoring integrations,
    and never describe the blacklist as an AML system.
 6. **Money is exact:** integer base units, double-entry append-only ledger,
@@ -1269,3 +1275,68 @@ a separate written approval decision; neither exists.
   labelled accordingly where a step is operator judgment.
   Production status unchanged: NOT Production Approved; the
   production tutorial installs with the signer gate closed.
+
+### 2026-11-13 — Workflow-gap closures: deposit minimum, withdrawal minimum, gas top-up address, static sweep destinations (William's specified workflow check)
+
+- William specified the target tenant workflow end to end
+  (register → project → gas-station address → deposit →
+  confirmations → gas top-up to the deposit address → sweep to
+  per-chain hot wallets, manually or via API → admin-approved
+  withdrawals → client-set min/max). Verification against the
+  code found most of it already implemented; the gaps below
+  were built in this package. Per his follow-up instruction,
+  deposit MAXIMUM was deliberately NOT built (accept any
+  amount; a cap could strand user funds) — deposit minimum only.
+- Deposit minimum: `DepositPolicy` (indexing, per project+asset,
+  migration 0002) enforced in the shared confirmation pass all
+  four scanner families funnel into. Below-minimum deposits are
+  HELD via the existing held/hold_reason mechanism (reason
+  "below minimum deposit (N)") and accumulate per
+  (wallet, asset): when a confirmation pass's matured group plus
+  the held pool reaches the minimum, pool + group credit
+  together, each with its own DEPOSIT_CREDIT journal (reorg
+  reversal stays per-deposit). Dashboard API
+  GET/PUT /deposit-policies (manage: owner/administrator).
+- Withdrawal minimum: `WithdrawalPolicy.min_single_amount`
+  (operations migration 0003, NULL = none) enforced beside the
+  max/daily hard limits in create_withdrawal_request (REJECTED
+  with the reason kept); exposed in PolicyIn + both policy
+  serializers.
+- Gas station: `GET /gas-stations` responses now include
+  `top_up_address` — the funding wallet's address on the
+  station's network (null until provisioned); documented in
+  docs/architecture/gas-station.md.
+- Static sweep destinations (ADR 0006 AMENDED at William's
+  direction — amendment text in docs/adr/0006 and
+  docs/api/sweep-resolver.md, rule 4 above updated):
+  `SweepPolicy.destination_mode` (resolver default | static),
+  `StaticSweepDestination` per (project, network) registered via
+  PUT /sweep-destinations (owner/administrator; family-validated
+  + normalized like the address book), GET list + DELETE;
+  GET/PUT /sweep-policy added (the policy previously had no
+  API). process_sweep branches at resolution time only: static
+  mode re-validates the stored address, snapshots it into the
+  same immutable ResolvedDestinationSnapshot (new `source`
+  field), and fails closed (RESOLUTION_FAILED) when absent,
+  disabled, or invalid — no resolver fallback. All downstream
+  stages (blacklist/own-address checks, amount discovery,
+  approvals, signing from snapshot) are shared and unchanged.
+  Migrations sweeps 0003 + 0004: 0004 re-applies the Phase 12
+  append-only triggers because adding the snapshot column
+  remakes the table on SQLite and drops them (caught by
+  test_hardening; the installer is idempotent and 0004 depends
+  on ledger 0003 to guarantee order).
+- Tests: tests/integration/test_workflow_gaps.py (9): hold →
+  accumulate → credit (60 + 50 vs min 100, balance 110), pool
+  release alongside a large deposit, no-policy passthrough,
+  deposit-policy API + role denial; withdrawal min rejected
+  with reason + policy API roundtrip; gas station top_up_address
+  in the list response; static resolution → AWAITING_APPROVAL
+  with source="static" snapshot, static-without-destination
+  RESOLUTION_FAILED, destination/policy APIs + invalid-address
+  422 + viewer 403. Full suite **217 passed / 1 skipped**
+  (JUnit), ruff check clean.
+- NOT verified: live-chain behaviour of the new paths (egress,
+  as ever); dashboard Vue views for the new endpoints remain
+  the recorded follow-up. Status unchanged: NOT Production
+  Approved.

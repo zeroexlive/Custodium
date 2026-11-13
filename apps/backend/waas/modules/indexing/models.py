@@ -114,3 +114,37 @@ class ObservedDeposit(models.Model):
 
     def __str__(self) -> str:  # pragma: no cover - display only
         return f"ObservedDeposit({self.id}, {self.network.slug}, {self.status})"
+
+
+class DepositPolicy(models.Model):
+    """Per-(project, asset) deposit rules (2026-11-13).
+
+    `min_amount` is the smallest single deposit, in integer base
+    units, that is credited on its own. Deposits below it are
+    HELD (observed, never silently dropped) and are credited
+    together once the held total for the same wallet + asset
+    reaches the minimum — the standard "small deposits
+    accumulate" behaviour. Zero disables the minimum. There is
+    deliberately NO maximum: capping deposits would strand user
+    funds on-chain, so the platform accepts and credits any
+    amount at or above the minimum.
+    """
+
+    project = models.ForeignKey(
+        "projects.Project", on_delete=models.CASCADE, related_name="deposit_policies"
+    )
+    asset = models.ForeignKey(
+        Asset, on_delete=models.CASCADE, related_name="deposit_policies"
+    )
+    min_amount = models.DecimalField(max_digits=78, decimal_places=0, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "asset"], name="uniq_deposit_policy_per_asset"
+            )
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover - display only
+        return f"DepositPolicy({self.project_id}, {self.asset_id}, min={self.min_amount})"

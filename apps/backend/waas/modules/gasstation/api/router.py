@@ -40,11 +40,20 @@ def _role(request, project):
 
 
 def _station_out(station: GasStation) -> dict:
+    # The address the client tops up with native coin for this
+    # network: the funding wallet's address on the station's
+    # network (None until that wallet is provisioned).
+    from waas.modules.wallets.models import Address
+
+    address_row = Address.objects.filter(
+        wallet_id=station.funding_wallet_id, network_id=station.network_id
+    ).first()
     return {
         "id": str(station.id),
         "project_id": str(station.project_id),
         "network": station.network.slug,
         "funding_wallet_id": str(station.funding_wallet_id),
+        "top_up_address": address_row.address if address_row else None,
         "enabled": station.enabled,
         "min_native_balance": str(station.min_native_balance),
         "topup_amount": str(station.topup_amount),

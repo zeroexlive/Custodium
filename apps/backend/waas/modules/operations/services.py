@@ -160,7 +160,12 @@ def create_withdrawal_request(
         service_fee=int(policy.service_fee_flat),
     )
     # Hard policy limits reject immediately, with the reason kept.
-    if policy.max_single_amount is not None and amount > int(policy.max_single_amount):
+    if policy.min_single_amount is not None and amount < int(policy.min_single_amount):
+        request.status = WithdrawalRequest.Status.REJECTED
+        request.status_reason = (
+            f"policy: single-withdrawal minimum is {int(policy.min_single_amount)}"
+        )
+    elif policy.max_single_amount is not None and amount > int(policy.max_single_amount):
         request.status = WithdrawalRequest.Status.REJECTED
         request.status_reason = (
             f"policy: single-withdrawal limit is {int(policy.max_single_amount)}"

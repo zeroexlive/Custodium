@@ -40,6 +40,9 @@ class WithdrawalPolicy(models.Model):
         blank=True,
         related_name="withdrawal_policies",
     )
+    min_single_amount = models.DecimalField(
+        max_digits=78, decimal_places=0, null=True, blank=True
+    )
     max_single_amount = models.DecimalField(
         max_digits=78, decimal_places=0, null=True, blank=True
     )

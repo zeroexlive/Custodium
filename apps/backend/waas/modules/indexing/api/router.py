@@ -367,3 +367,87 @@ def list_wallet_deposits(request, wallet_id: str, project_id: str | None = None)
             for d in deposits
         ],
     }
+
+
+# ---------------------------------------------------------------- deposit policies
+
+from ninja import Schema as _Schema  # noqa: E402
+
+from waas.api.authentication import DashboardAuth as _DashboardAuth  # noqa: E402
+
+_dashboard_auth = _DashboardAuth()
+from waas.modules.assets.models import Asset as _Asset  # noqa: E402
+from waas.modules.indexing.models import DepositPolicy as _DepositPolicy  # noqa: E402
+from waas.modules.organizations.models import (  # noqa: E402
+    Membership as _Membership,
+)
+
+_POLICY_MANAGE_ROLES = ("owner", "administrator")
+
+
+class DepositPolicyIn(_Schema):
+    project_id: str
+    asset_id: str
+    min_amount: str = "0"
+
+
+def _policy_project(request, project_id: str, *, manage: bool) -> Project:
+    project = Project.objects.filter(id=project_id).first()
+    if project is None:
+        raise HttpError(404, "project not found")
+    membership = _Membership.objects.filter(
+        organization=project.organization, user=request.actor
+    ).first()
+    if membership is None:
+        raise HttpError(404, "project not found")
+    if manage and membership.role not in _POLICY_MANAGE_ROLES:
+        raise HttpError(403, "managing deposit policies requires owner or administrator")
+    return project
+
+
+def _policy_out(policy: _DepositPolicy) -> dict:
+    return {
+        "project_id": str(policy.project_id),
+        "asset_id": str(policy.asset_id),
+        "asset": policy.asset.symbol,
+        "network": policy.asset.network.slug,
+        "min_amount": str(int(policy.min_amount)),
+    }
+
+
+@router.get("/deposit-policies", auth=_dashboard_auth, response={200: list[dict], 404: dict})
+def list_deposit_policies(request, project_id: str):
+    project = _policy_project(request, project_id, manage=False)
+    return [
+        _policy_out(policy)
+        for policy in _DepositPolicy.objects.filter(project=project).select_related("asset__network")
+    ]
+
+
+@router.put(
+    "/deposit-policies",
+    auth=_dashboard_auth,
+    response={200: dict, 403: dict, 404: dict, 422: dict},
+)
+def put_deposit_policy(request, payload: DepositPolicyIn):
+    project = _policy_project(request, payload.project_id, manage=True)
+    asset = _Asset.objects.filter(id=payload.asset_id, network__isnull=False).first()
+    if asset is None or asset.network_id is None:
+        raise HttpError(404, "asset not found")
+    try:
+        min_amount = int(payload.min_amount)
+    except (TypeError, ValueError):
+        raise HttpError(422, "min_amount must be an integer in base units") from None
+    if min_amount < 0:
+        raise HttpError(422, "min_amount cannot be negative")
+    policy, _created = _DepositPolicy.objects.update_or_create(
+        project=project, asset=asset, defaults={"min_amount": min_amount}
+    )
+    AuditEvent.record(
+        "deposit_policy.updated",
+        actor_user=request.actor,
+        organization=project.organization,
+        project=project,
+        metadata={"asset": asset.symbol, "min_amount": str(min_amount)},
+    )
+    return _policy_out(policy)
