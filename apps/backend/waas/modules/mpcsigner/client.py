@@ -38,9 +38,16 @@ SIGN_TIMEOUT_SECONDS = 300.0
 READ_TIMEOUT_SECONDS = 30.0
 
 
-def key_id_for(wallet) -> str:
-    """The signer-service key id for a wallet (deterministic)."""
-    return f"wallet-{wallet.id}"
+def key_id_for(wallet, curve: str) -> str:
+    """The signer-service key id for one of a wallet's keys.
+
+    Key ids are per curve — the signer service stores exactly one
+    key per key id, and a wallet holds two independent threshold
+    keys (ECDSA for EVM/BSC/TRON, Ed25519 for Solana/TON).
+    """
+    if curve not in ("ecdsa", "ed25519"):
+        raise ValueError(f"unknown curve '{curve}'")
+    return f"wallet-{wallet.id}-{curve}"
 
 
 def signer_enabled() -> bool:
@@ -159,7 +166,7 @@ class RemoteEcdsaSigner:
         self._client = client
 
     def wallet_public_key(self, wallet) -> bytes:
-        meta = self._client.get_key(key_id_for(wallet))
+        meta = self._client.get_key(key_id_for(wallet, "ecdsa"))
         if meta.get("curve") != "secp256k1":
             raise EcdsaUnavailable("wallet key is not an ECDSA key")
         return bytes.fromhex(meta["public_key"])
@@ -167,7 +174,7 @@ class RemoteEcdsaSigner:
     def sign_digest(self, wallet, digest: bytes) -> tuple[int, int]:
         if len(digest) != 32:
             raise EcdsaUnavailable("digest must be 32 bytes")
-        return self._client.sign_ecdsa(key_id_for(wallet), digest)
+        return self._client.sign_ecdsa(key_id_for(wallet, "ecdsa"), digest)
 
 
 class RemoteEd25519Signer:
@@ -178,7 +185,7 @@ class RemoteEd25519Signer:
 
     def wallet_public_key(self, wallet) -> bytes:
         try:
-            meta = self._client.get_key(key_id_for(wallet))
+            meta = self._client.get_key(key_id_for(wallet, "ed25519"))
         except EcdsaUnavailable as exc:
             raise Ed25519Unavailable(str(exc)) from exc
         if meta.get("curve") != "ed25519":
@@ -186,4 +193,4 @@ class RemoteEd25519Signer:
         return bytes.fromhex(meta["public_key"])
 
     def sign_message(self, wallet, message: bytes) -> bytes:
-        return self._client.sign_ed25519(key_id_for(wallet), message)
+        return self._client.sign_ed25519(key_id_for(wallet, "ed25519"), message)

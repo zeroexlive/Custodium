@@ -131,6 +131,33 @@ def set_wallet_status(request, wallet_id: str, payload: WalletStatusIn):
     return wallet_out(wallet)
 
 
+@router.post("/wallets/{wallet_id}/provision", response=dict, auth=dashboard_auth)
+def provision_wallet_view(request, wallet_id: str):
+    """Run real MPC key generation for this wallet via the signer
+    service and activate it (operator action, owner/administrator).
+
+    Fails with 409 — leaving the wallet `provisioning` — while the
+    signer gate is closed or the signer service cannot complete
+    the ceremonies; see waas.modules.wallets.provisioning.
+    """
+    from waas.modules.wallets.provisioning import (
+        ProvisioningUnavailable,
+        provision_wallet,
+    )
+
+    wallet = _scoped_wallet(request, wallet_id)
+    membership = Membership.objects.filter(
+        user=request.auth, organization=wallet.project.organization
+    ).first()
+    if membership is None or membership.role not in WRITE_ROLES:
+        raise HttpError(403, "Your role cannot provision wallets")
+    try:
+        wallet = provision_wallet(wallet, actor_user=request.auth)
+    except ProvisioningUnavailable as exc:
+        raise HttpError(409, str(exc)) from exc
+    return wallet_out(wallet)
+
+
 @router.get("/wallets/{wallet_id}/addresses", response=dict, auth=any_auth)
 def list_addresses(request, wallet_id: str, network: str | None = None):
     if is_machine(request) and not has_any_scope(request, "addresses:read", "wallets:read", "read"):

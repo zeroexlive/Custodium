@@ -34,17 +34,19 @@ from waas.modules.solana.signing import (
 from waas.modules.solana.signing import UnavailableEd25519Signer
 
 WALLET = SimpleNamespace(id=uuid.UUID("12345678-1234-5678-1234-567812345678"))
-KEY_ID = key_id_for(WALLET)
+ECDSA_KEY_ID = key_id_for(WALLET, "ecdsa")
+ED25519_KEY_ID = key_id_for(WALLET, "ed25519")
+assert ECDSA_KEY_ID != ED25519_KEY_ID  # one key id per curve
 
 ECDSA_META = {
-    "key_id": KEY_ID,
+    "key_id": ECDSA_KEY_ID,
     "curve": "secp256k1",
     "t": 2,
     "n": 3,
     "public_key": "04" + "ab" * 64,
 }
 ED25519_META = {
-    "key_id": KEY_ID,
+    "key_id": ED25519_KEY_ID,
     "curve": "ed25519",
     "t": 2,
     "n": 3,

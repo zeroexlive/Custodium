@@ -59,7 +59,7 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 0 | Architecture & Security Research | Implemented (verified locally 2026-11-12; not Security Reviewed / Production Approved) |
 | 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
 | 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
-| 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned. Post-roadmap 2026-11-13: production signer service IMPLEMENTED (see history + `docs/architecture/production-signer.md`); activation still gated off pending the review |
+| 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned. Post-roadmap 2026-11-13: production signer service IMPLEMENTED (see history + `docs/architecture/production-signer.md`); activation still gated off pending the review. Wallet provisioning wired to the signer behind the same gate + full rehearsal passed (2026-11-13, see history) |
 | 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
 | 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
 | 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
@@ -1097,4 +1097,68 @@ a separate written approval decision; neither exists.
   beyond protocol aborts — and the independent review itself,
   which now has an implementation to review. Remaining gates
   unchanged: commission the review, pentest, legal, funded
+  testnet soaks, live drills, written approval decision.
+
+### 2026-11-13 — Wallet provisioning wired to the signer + rehearsal (post-roadmap, William's direction)
+
+- What changed: wallets can now actually be provisioned through
+  the production signer. Key ids became PER CURVE
+  (`wallet-<uuid>-ecdsa` / `wallet-<uuid>-ed25519` — the signer
+  service stores one key per key id and a wallet holds two
+  independent threshold keys; `key_id_for(wallet, curve)` in
+  `waas/modules/mpcsigner/client.py`, both signing ports and the
+  client tests updated). New setting `MPC_SIGNER_THRESHOLD`
+  (default 2). New `waas/modules/wallets/provisioning.py`:
+  `provision_wallet` refuses (wallet untouched) when the signer
+  gate is closed, the registry is empty, the wallet is
+  frozen/archived, or the signer fails; otherwise get-or-creates
+  both keys (adopting existing keys after a partial failure —
+  no re-keying), derives one address per family from the group
+  public keys via the families' canonical helpers, records an
+  address for EVERY seeded network through
+  `record_derived_address`, stores the opaque key refs, flips
+  the wallet to `active`, and audits `wallet.provisioned`.
+  Ceremonies run outside DB transactions; only the
+  address/wallet/audit writes are atomic. An active wallet with
+  keys but missing addresses is backfilled, never re-keyed.
+  Entry points: `POST /wallets/{id}/provision` (dashboard auth,
+  WRITE_ROLES; 409 when the gate is closed) and the
+  `provision_wallet` management command. Defaults unchanged:
+  gate closed, wallets stay `provisioning`, Custodium NOT
+  Production Approved.
+- Tests: `tests/integration/test_wallet_provisioning.py` (9) with
+  an in-memory fake coordinator (404→create→409 semantics) and
+  FIXED group keys — generator-point ECDSA key whose EVM address
+  is the externally known private-key-1 address
+  `0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf` (independent
+  anchor), TRON/Solana/TON expectations pinned from the family
+  helpers (which carry their own golden/differential tests).
+  Covers gate-closed refusal, happy path (10 networks), idempotent
+  re-run, resume-after-crash key adoption, frozen refusal,
+  signer-outage atomicity, endpoint 409 + happy path. First run
+  caught that test DBs have an EMPTY network registry (seeding is
+  the `seed_networks_assets` command, not a migration) — the
+  empty-registry guard above came from that.
+- REHEARSAL (the point of the work): `scripts/rehearse_provisioning.py`
+  booted 3 real signer binaries + the real backend (gate open for
+  the run only, throwaway SQLite/stores under
+  `~/custodium-rehearsal/run-20261113T064428Z/`) and drove the
+  public API: register → org → project → wallet → provision in
+  204.7 s → `active` with 10 addresses. The driver then verified
+  EVM/TRON/Solana addresses by recomputing them from the
+  signer-reported group keys WITHOUT the backend's helpers
+  (TON shape-only; Phase 8 differential covers its derivation),
+  and proved backend-initiated signing through the real dispatch
+  factories: ECDSA signature recovered to the wallet's EVM
+  address `0x5fca24b7822778Dca3ede2ad4009CE59D5822576`, FROST
+  signature verified with `cryptography`. Teardown confirmed
+  (no stray processes). Record: `docs/operations/provisioning-rehearsal.md`.
+- Full verification: backend pytest **196 passed / 1 skipped**
+  (JUnit; +9 over the signer build's 187), ruff clean, rehearsal
+  driver compiles. No Rust changes in this package.
+- NOT verified: multi-host deployment, TLS/mTLS, live chains
+  (no deposits/withdrawals moved — signing was proven against
+  digests/messages only), the dashboard UI against a provisioned
+  wallet. Remaining gates unchanged: commission the independent
+  review (now covering provisioning too), pentest, legal, funded
   testnet soaks, live drills, written approval decision.
