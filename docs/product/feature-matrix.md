@@ -80,10 +80,15 @@ WaaS products are compared on). Status meanings:
   signer transport (`docs/architecture/production-signer.md`);
   bearer tokens today, mTLS is pre-production hardening tracked
   in the readiness checklist.
-- **Dashboard UI for the newest endpoints** (2FA enrollment,
-  address book, auto-sweep rules) — the APIs are complete and
-  dashboard-authenticated; wiring the Vue views is a follow-up
-  UI pass, tracked here so it is not mistaken for done.
+- **Dashboard UI for the newest endpoints** — DONE 2026-11-13:
+  Security view (2FA enrollment + the two-step login challenge),
+  Address Book (with the allowlist-required toggle), Sweep
+  Settings (sweep policy incl. destination mode, static
+  destinations, auto-sweep rules), Deposit Policies, API-key
+  IP-allowlist/expiry form fields and list display, webhook
+  secret rotation, the withdrawal-policy minimum field, and the
+  gas-station top-up address column. Verified by vue-tsc + vite
+  build and vitest (15 passed).
 
 ## External (not code)
 

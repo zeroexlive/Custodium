@@ -61,7 +61,7 @@ const decide = useMutation({
 
 // Policy editor (project default policy)
 const policyForm = ref({
-  approvals_required: '1', max_single_amount: '', daily_limit: '',
+  approvals_required: '1', min_single_amount: '', max_single_amount: '', daily_limit: '',
   auto_approve_below: '0', service_fee_flat: '0',
 })
 const savedPolicy = computed(() => policy.data.value)
@@ -69,6 +69,7 @@ const savePolicy = useMutation({
   mutationFn: () =>
     api.updateWithdrawalPolicy(projectId.value, {
       approvals_required: Number(policyForm.value.approvals_required || 1),
+      min_single_amount: policyForm.value.min_single_amount || null,
       max_single_amount: policyForm.value.max_single_amount || null,
       daily_limit: policyForm.value.daily_limit || null,
       auto_approve_below: policyForm.value.auto_approve_below || '0',
@@ -166,6 +167,7 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
         <p v-if="savedPolicy" class="mt-1 text-sm text-slate-500">
           Current: {{ savedPolicy.approvals_required }} approval(s),
           auto-approve ≤ {{ savedPolicy.auto_approve_below }},
+          min single {{ savedPolicy.min_single_amount ?? '0' }},
           max single {{ savedPolicy.max_single_amount ?? '∞' }},
           daily {{ savedPolicy.daily_limit ?? '∞' }},
           service fee {{ savedPolicy.service_fee_flat }}
@@ -174,6 +176,7 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
           <Input id="pol-approvals" v-model="policyForm.approvals_required" label="Approvals required" type="number" />
           <Input id="pol-auto" v-model="policyForm.auto_approve_below" label="Auto-approve at or below" />
           <Input id="pol-fee" v-model="policyForm.service_fee_flat" label="Service fee (flat, base units)" />
+          <Input id="pol-min-single" v-model="policyForm.min_single_amount" label="Min single (blank = none)" />
           <Input id="pol-single" v-model="policyForm.max_single_amount" label="Max single (blank = none)" />
           <Input id="pol-daily" v-model="policyForm.daily_limit" label="Daily limit (blank = none)" />
         </div>

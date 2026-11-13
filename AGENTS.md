@@ -1340,3 +1340,41 @@ a separate written approval decision; neither exists.
   as ever); dashboard Vue views for the new endpoints remain
   the recorded follow-up. Status unchanged: NOT Production
   Approved.
+
+### 2026-11-13 — Dashboard UI pass: views for the PR #22/#24 endpoints (William approved the proposed pass)
+
+- New views (all following the existing project-picker +
+  TanStack Query patterns and DESIGN.md language):
+  Security (2FA status from /me, setup → secret + provisioning
+  URI shown for authenticator entry, enable → recovery codes
+  shown once, disable with a current/recovery code); the login
+  flow now handles the TOTP challenge — auth store `login`
+  returns 'totp' without persisting a token, `completeTotp`
+  verifies against /auth/2fa/verify and only then persists;
+  Address Book (entries CRUD + the withdrawal allowlist-required
+  toggle); Sweep Settings (sweep policy incl. destination_mode,
+  static hot-wallet destinations CRUD, auto-sweep rules CRUD);
+  Deposit Policies (per-asset minimum editor; copy states there
+  is deliberately no maximum). Nav + routes added for all four.
+- Extended existing views: API Keys create form gains the IP
+  allowlist (one per line) and expiry fields, and the key list
+  shows allowlist/expiry; Webhooks gains Rotate secret per
+  endpoint, reusing the shown-once secret panel; Withdrawals
+  policy form gains the minimum-single field (+ summary line);
+  Gas Station table shows the station top_up_address.
+- Client/types: new api functions for 2FA, address book +
+  policy, deposit policies, sweep policy/destinations/rules,
+  webhook rotation; types for all of the above (AutoSweepRule
+  display resolves the asset symbol client-side because the API
+  returns asset_id only).
+- Verified: `npm run build` (vue-tsc strict + vite) green;
+  vitest 15 passed (9 pre-existing + 6 new in
+  tests/new-features-client.spec.ts: request shapes for the new
+  endpoints + the two-step TOTP store flow asserting no token
+  is persisted before verification). One contract mismatch
+  caught during the pass: auto-sweep rule rows carry asset_id,
+  not a symbol — fixed client-side.
+- NOT verified: the views against a live backend in a browser
+  (no browser-driven run in this environment); backend endpoint
+  behaviour itself is covered by the PR #22/#24 test suites.
+  Status unchanged: NOT Production Approved.

@@ -123,7 +123,7 @@ function tone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="text-left text-ink-muted">
-              <th class="py-1">Network</th><th>Funding wallet</th><th>Min balance</th>
+              <th class="py-1">Network</th><th>Funding wallet</th><th>Top-up address</th><th>Min balance</th>
               <th>Top-up</th><th>Daily cap</th><th>Enabled</th>
             </tr>
           </thead>
@@ -131,6 +131,7 @@ function tone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
             <tr v-for="s in stations.data.value ?? []" :key="s.id" class="border-t border-line">
               <td class="py-2">{{ s.network }}</td>
               <td>{{ s.funding_wallet_id.slice(0, 8) }}…</td>
+              <td class="font-mono break-all">{{ s.top_up_address ?? '— (funding wallet not provisioned)' }}</td>
               <td>{{ s.min_native_balance }}</td>
               <td>{{ s.topup_amount }}</td>
               <td>{{ s.max_topups_per_day }}</td>
