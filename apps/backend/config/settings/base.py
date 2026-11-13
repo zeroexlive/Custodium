@@ -135,6 +135,9 @@ REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
 MPC_SIGNER_ENABLED = env_bool("MPC_SIGNER_ENABLED", False)
 MPC_SIGNER_URL = env("MPC_SIGNER_URL", "")
 MPC_SIGNER_TOKEN = env("MPC_SIGNER_TOKEN", "")
+# Threshold for newly provisioned wallet keys (t-of-n across the
+# signer nodes; the platform default is 2-of-3).
+MPC_SIGNER_THRESHOLD = int(env("MPC_SIGNER_THRESHOLD", "2"))
 
 LOGGING = {
     "version": 1,

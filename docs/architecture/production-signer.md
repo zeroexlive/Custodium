@@ -53,17 +53,46 @@ each of S4/S5/S6). Each node:
 
 `waas.modules.mpcsigner.client.SignerServiceClient` implements
 both signing ports (`RemoteEcdsaSigner`, `RemoteEd25519Signer`)
-over the coordinator API. Wallets map to signer keys as
-`wallet-<uuid>`. Error mapping is fail-closed: any transport or
-service error raises the port's `SigningUnavailable`, which the
-family pipelines already treat as a clean abort (reservation
-released).
+over the coordinator API. Wallets map to signer keys per curve —
+`wallet-<uuid>-ecdsa` and `wallet-<uuid>-ed25519` — because the
+service stores exactly one key per key id and a wallet holds two
+independent threshold keys. Error mapping is fail-closed: any
+transport or service error raises the port's
+`SigningUnavailable`, which the family pipelines already treat as
+a clean abort (reservation released).
 
 The operations dispatch factories return the remote signers
 **only when both** `MPC_SIGNER_ENABLED=true` **and**
 `MPC_SIGNER_URL` are set. Defaults are off/unset, so a stray URL
 or a stray flag cannot activate signing. Tests pin all four
 combinations.
+
+## Wallet provisioning (post-roadmap, 2026-11-13)
+
+`waas.modules.wallets.provisioning.provision_wallet` closes the
+Phase 2 loop — a wallet becomes `active` only when MPC key
+generation has actually completed. It is an operator action,
+reachable via `POST /wallets/{id}/provision` (dashboard auth,
+owner/administrator roles) or the `provision_wallet` management
+command, and it runs only while the signer gate is open; with
+the gate closed it refuses (HTTP 409 at the endpoint) and the
+wallet remains `provisioning`.
+
+Flow, idempotent and resumable after a partial failure:
+get-or-create both threshold keys (threshold from
+`MPC_SIGNER_THRESHOLD`, default 2) → derive one address per
+chain family from the group public keys with each family's
+canonical helper → record an address for every seeded network
+through `record_derived_address` → store the opaque key ids on
+the wallet, flip to `active`, audit `wallet.provisioned`. The
+ceremonies run outside any database transaction; only the
+address/wallet/audit writes are atomic. An active wallet with
+keys but missing addresses (e.g. provisioned before the registry
+was seeded) is backfilled, never re-keyed. A rehearsal driver
+(`scripts/rehearse_provisioning.py`) exercises the whole flow
+against real signer processes and a real backend server; the
+2026-11-13 run is recorded in
+`docs/operations/provisioning-rehearsal.md`.
 
 ## Verification performed (2026-11-13, this dev VM)
 
