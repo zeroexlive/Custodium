@@ -238,6 +238,26 @@ Therefore:
    (and on explicit, audited rotation) over the dashboard
    session, never sent by email, never logged.
 
+## 6b. Dashboard two-factor authentication (TOTP) — implemented 2026-11-13
+
+Dashboard users can enable TOTP two-factor authentication
+(RFC 6238): `POST /auth/2fa/setup` issues a shared secret
+(Fernet-encrypted at rest, shown once with its `otpauth://` URI),
+`POST /auth/2fa/enable` activates it after a valid code and
+returns eight one-time **recovery codes** (only SHA-256 digests
+are stored), and `POST /auth/2fa/disable` turns it off with a
+valid code or recovery code. With 2FA enabled, `POST /auth/login`
+verifies the password and returns `requires_totp: true` with a
+signed, five-minute `mfa_token` instead of a session;
+`POST /auth/2fa/verify` exchanges `mfa_token` + code (or a
+recovery code, consumed on use) for the session. All transitions
+are audit-logged.
+
+API keys likewise accept two hardening options at creation —
+`ip_allowlist` (source IPs allowed to use the key) and
+`expires_at` — both enforced by the machine-auth layer on every
+request.
+
 ## 7. Rotation and revocation
 
 - **Scheduled rotation:** create a successor key, distribute it,

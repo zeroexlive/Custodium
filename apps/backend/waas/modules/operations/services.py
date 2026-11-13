@@ -134,6 +134,16 @@ def create_withdrawal_request(
         address=destination_address, network=network, project=project
     ):
         raise OperationsError("destination address is blacklisted")
+    if project.withdrawal_allowlist_required:
+        from waas.modules.addressbook import services as addressbook_services
+
+        if not addressbook_services.is_allowlisted(
+            project=project, network=network, address=destination_address
+        ):
+            raise OperationsError(
+                "destination address is not on this project's allowlist "
+                "(destination address book)"
+            )
 
     policy = resolve_policy(project=project, asset=asset)
     request = WithdrawalRequest(

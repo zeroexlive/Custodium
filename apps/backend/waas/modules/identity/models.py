@@ -38,6 +38,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(unique=True)
     display_name = models.CharField(max_length=150, blank=True)
     is_email_verified = models.BooleanField(default=False)
+    # Two-factor authentication (TOTP, RFC 6238). The shared secret
+    # is stored ONLY as Fernet ciphertext; recovery codes only as
+    # SHA-256 digests. Both are set through the /auth/2fa endpoints.
+    totp_secret_ciphertext = models.TextField(null=True, blank=True)
+    totp_enabled = models.BooleanField(default=False)
+    totp_recovery_hashes = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)

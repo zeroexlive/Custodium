@@ -34,7 +34,9 @@ def _project_for_member(user: object, project_id: str, *, write: bool) -> Projec
 
 
 def _create_key(project: Project, user: object, name: str, scopes: list[str],
-                rotated_from: ApiKey | None = None) -> tuple[ApiKey, str]:
+                rotated_from: ApiKey | None = None,
+                ip_allowlist: list[str] | None = None,
+                expires_at: object = None) -> tuple[ApiKey, str]:
     invalid = [s for s in scopes if s not in ALLOWED_SCOPES]
     if invalid:
         raise HttpError(422, f"Unknown scopes: {', '.join(invalid)}")
@@ -42,6 +44,7 @@ def _create_key(project: Project, user: object, name: str, scopes: list[str],
     key = ApiKey.objects.create(
         project=project, name=name, key_id=ApiKey.generate_key_id(project.environment),
         secret_ciphertext=encrypt_secret(secret), scopes=scopes,
+        ip_allowlist=list(ip_allowlist or []), expires_at=expires_at,
         created_by=user, rotated_from=rotated_from,
     )
     return key, secret
@@ -59,11 +62,18 @@ def create_api_key(request, payload: ApiKeyIn):
         plan_services.check_api_key_quota(project)
     except plan_services.QuotaExceeded as exc:
         raise HttpError(403, str(exc)) from exc
-    key, secret = _create_key(project, request.auth, name, payload.scopes)
+    key, secret = _create_key(
+        project, request.auth, name, payload.scopes,
+        ip_allowlist=payload.ip_allowlist, expires_at=payload.expires_at,
+    )
     AuditEvent.record(
         "api_key.created", actor_user=request.auth,
         organization=project.organization, project=project, api_key=key,
-        metadata={"scopes": payload.scopes},
+        metadata={
+            "scopes": payload.scopes,
+            "ip_allowlist": payload.ip_allowlist,
+            "expires_at": payload.expires_at.isoformat() if payload.expires_at else None,
+        },
     )
     result = api_key_out(key)
     result["secret"] = secret  # shown exactly once — never stored client-side

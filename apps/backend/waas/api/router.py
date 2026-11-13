@@ -3,6 +3,7 @@ from __future__ import annotations
 from ninja import NinjaAPI, Router
 
 from waas.api.authentication import AnyAuth, DashboardAuth
+from waas.modules.addressbook.api.router import router as addressbook_router
 from waas.modules.api_credentials.api.router import router as api_credentials_router
 from waas.modules.assets.api.router import router as assets_router
 from waas.modules.audit.api.router import router as audit_router
@@ -40,6 +41,7 @@ api.add_router("", audit_router)
 api.add_router("", wallets_router)
 api.add_router("", ledger_router)
 api.add_router("", blacklist_router)
+api.add_router("", addressbook_router)
 api.add_router("", indexing_router)
 api.add_router("", operations_router)
 api.add_router("", operations_dashboard_router)

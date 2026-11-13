@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "waas.modules.wallets",
     "waas.modules.ledger",
     "waas.modules.blacklist",
+    "waas.modules.addressbook",
     "waas.modules.evm",
     "waas.modules.indexing",
     "waas.modules.tron",

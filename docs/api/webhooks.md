@@ -52,6 +52,15 @@ Body (compact JSON, sorted keys):
 whose timestamp is far from your clock (replay window) and
 always verify against the raw bytes, never a re-serialisation.
 
+## Rotating the signing secret
+
+`POST /webhooks/endpoints/{id}/rotate-secret` (owner/administrator,
+or a machine key with `webhooks:manage`) replaces the endpoint's
+`whsec_` secret and returns the new one exactly once. The old
+secret stops verifying immediately — update the receiver in the
+same change window. Rotations are audit-logged
+(`webhook.secret_rotated`).
+
 ## Retries and replay
 
 Any non-2xx response (or transport failure) schedules a retry:

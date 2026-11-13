@@ -9,6 +9,7 @@ from ninja.errors import HttpError
 
 from waas.api.authentication import AnyAuth, DashboardAuth
 from waas.api.context import has_any_scope, is_machine, resolve_project
+from waas.modules.audit.models import AuditEvent
 from waas.modules.organizations.models import Membership
 from waas.modules.sweeps.resolver import ResolutionError
 
@@ -100,6 +101,26 @@ def delete_endpoint(request, endpoint_id: str):
     endpoint.enabled = False
     endpoint.save(update_fields=["enabled", "updated_at"])
     return _out(endpoint)
+
+
+@router.post(
+    "/webhooks/endpoints/{endpoint_id}/rotate-secret",
+    response={200: dict, 403: dict, 404: dict},
+)
+def rotate_endpoint_secret(request, endpoint_id: str):
+    """Replace the endpoint's signing secret (shown once). The
+    old secret stops verifying immediately."""
+    endpoint = WebhookEndpoint.objects.filter(id=endpoint_id).select_related("project").first()
+    if endpoint is None:
+        raise HttpError(404, "endpoint not found")
+    _authorize_write(request, endpoint.project)
+    secret = services.rotate_signing_secret(endpoint=endpoint)
+    AuditEvent.record(
+        "webhook.secret_rotated",
+        organization=endpoint.project.organization, project=endpoint.project,
+        metadata={"endpoint_id": str(endpoint.id)},
+    )
+    return {**_out(endpoint), "signing_secret": secret}
 
 
 @router.get("/webhooks/deliveries", response={200: list[dict], 404: dict})

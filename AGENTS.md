@@ -1162,3 +1162,67 @@ a separate written approval decision; neither exists.
   wallet. Remaining gates unchanged: commission the independent
   review (now covering provisioning too), pentest, legal, funded
   testnet soaks, live drills, written approval decision.
+
+### 2026-11-13 — Feature-completeness audit + gap closures (post-roadmap, William: "Make sure we have every feature that a usable mpc wallet has")
+
+- Audit: inventoried every router/model against the usable-MPC-WaaS
+  checklist. The platform already had more than the gap list first
+  assumed — API-key `ip_allowlist`/`expires_at` fields AND their
+  enforcement already existed in machine auth (only creation-time
+  settability was missing); fee accounting, refund playbook,
+  replayable webhooks, custom token registration, quotas/billing
+  all present. Full mapping: `docs/product/feature-matrix.md`
+  (Available / Gated / Added / Out-of-scope with reasons /
+  External), including the deliberate exclusions (UTXO chains,
+  staking/NFTs/ramps, AML/KYT by spec, cggmp24 key refresh,
+  signer mTLS) and one honest follow-up: dashboard Vue views for
+  the newest endpoints are NOT wired yet (APIs complete).
+- Closed in this package (all behind existing auth/roles, all
+  audit-logged):
+  1. **TOTP 2FA** for dashboard users (pyotp added): setup →
+     enable (valid code required) → login pauses at a signed
+     5-minute challenge (`requires_totp`, no session issued) →
+     verify completes it. 8 one-time recovery codes (digests
+     only), consumed on use; disable needs a code/recovery.
+     Secret Fernet-encrypted on the user row (migration
+     identity 0002). `AuthOut.token/access_token` are null
+     exactly during the challenge.
+  2. **API-key options**: `ApiKeyIn` now accepts `ip_allowlist`
+     + `expires_at`, echoed in `api_key_out`, recorded in the
+     creation audit event (enforcement pre-existed).
+  3. **Destination address book** (new `addressbook` module):
+     per-project per-network entries (normalized matching,
+     owner/administrator managed), plus
+     `Project.withdrawal_allowlist_required` (projects migration
+     0002) enforced in withdrawal creation beside the blacklist
+     check when on; book is informational when off.
+  4. **Webhook secret rotation**:
+     `POST /webhooks/endpoints/{id}/rotate-secret`, same write
+     authorization as endpoint management, old secret dies
+     immediately, audit `webhook.secret_rotated`.
+  5. **Auto-sweep rules** (sweeps migration 0002): per
+     (wallet, network, asset) balance threshold; `run_auto_sweeps`
+     creates sweeps through the ordinary path (resolver, policy,
+     approvals untouched downstream), at most one open auto
+     sweep per rule, idempotency from the rule trigger counter.
+     Dashboard CRUD at `/auto-sweep-rules` (path renamed from
+     `/sweeps/auto-rules`: the 2-segment path collided with
+     `GET /sweeps/{sweep_id}` and 405'd — address-book policy
+     routes had the same class of collision with
+     `DELETE /address-book/{entry_id}` and were reordered ahead
+     of it).
+- Tests: `tests/integration/test_feature_gaps.py` (12): full
+  TOTP challenge flow + recovery single-use + disable; IP
+  allowlist allowed/blocked via real HMAC whoami; expired vs
+  valid keys; address-book CRUD/uniqueness/roles + allowlist
+  enforcement service-level (blocked → added → allowed);
+  rotation replaces the stored secret (decrypt-verified) with
+  role denial; auto-sweep threshold/open-gating/disabled + API
+  + command smoke. Full suite **208 passed / 1 skipped**
+  (JUnit), ruff check clean. (`ruff format` is not a project
+  gate — pre-existing files fail it too; not applied.)
+- NOT verified: dashboard UI for the new endpoints (not built —
+  see matrix follow-up), TOTP against a real authenticator app
+  (pyotp is the RFC 6238 reference implementation path and the
+  tests compute codes with it), live anything. Status gates
+  unchanged: NOT Production Approved.

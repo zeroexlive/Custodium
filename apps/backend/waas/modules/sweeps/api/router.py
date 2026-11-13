@@ -23,7 +23,7 @@ from waas.modules.projects.models import Project
 from waas.modules.wallets.models import Wallet
 
 from .. import resolver, services
-from ..models import Sweep, SweepDestinationEndpoint
+from ..models import AutoSweepRule, Sweep, SweepDestinationEndpoint
 
 router = Router(tags=["sweeps"], auth=AnyAuth())
 dashboard_router = Router(tags=["sweeps-dashboard"], auth=DashboardAuth())
@@ -50,6 +50,28 @@ class EndpointTestIn(Schema):
 
 class ApprovalIn(Schema):
     note: str = ""
+
+
+class AutoRuleIn(Schema):
+    wallet_id: str
+    network: str  # network slug
+    asset_id: str
+    threshold_amount: str  # integer base units, as a string
+    enabled: bool = True
+
+
+def _auto_rule_out(rule: AutoSweepRule) -> dict:
+    return {
+        "id": str(rule.id),
+        "project_id": str(rule.project_id),
+        "wallet_id": str(rule.wallet_id),
+        "network": rule.network.slug,
+        "asset_id": str(rule.asset_id),
+        "threshold_amount": str(int(rule.threshold_amount)),
+        "enabled": rule.enabled,
+        "trigger_count": rule.trigger_count,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,
+    }
 
 
 def _role(request, project: Project):
@@ -158,6 +180,62 @@ def test_endpoint(request, payload: EndpointTestIn):
     except resolver.ResolutionError as exc:
         return 422, {"stage": exc.stage, "detail": exc.message}
     return {"address": result.address, "normalized": result.normalized, "network": network.slug}
+
+
+@dashboard_router.post(
+    "/auto-sweep-rules", response={201: dict, 403: dict, 404: dict, 409: dict, 422: dict}
+)
+def create_auto_rule(request, payload: AutoRuleIn):
+    wallet = Wallet.objects.filter(id=payload.wallet_id).select_related("project").first()
+    if wallet is None:
+        raise HttpError(404, "wallet not found")
+    resolve_project(request, str(wallet.project_id))
+    if _role(request, wallet.project) not in services.ENDPOINT_ADMIN_ROLES:
+        raise HttpError(403, "auto-sweep rules require an owner or administrator")
+    network = BlockchainNetwork.objects.filter(slug=payload.network).first()
+    asset = Asset.objects.filter(id=payload.asset_id).first()
+    if network is None or asset is None or asset.network_id != network.id:
+        raise HttpError(422, "unknown network or asset for that network")
+    try:
+        threshold = int(payload.threshold_amount)
+    except ValueError as exc:
+        raise HttpError(422, "threshold_amount must be an integer (base units)") from exc
+    if threshold <= 0:
+        raise HttpError(422, "threshold_amount must be positive")
+    if AutoSweepRule.objects.filter(
+        wallet=wallet, network=network, asset=asset
+    ).exists():
+        raise HttpError(409, "an auto-sweep rule already exists for this wallet/network/asset")
+    rule = AutoSweepRule.objects.create(
+        project=wallet.project, wallet=wallet, network=network, asset=asset,
+        threshold_amount=threshold, enabled=payload.enabled, created_by=request.actor,
+    )
+    return 201, _auto_rule_out(rule)
+
+
+@dashboard_router.get("/auto-sweep-rules", response={200: list[dict], 404: dict})
+def list_auto_rules(request, project_id: str = ""):
+    project = resolve_project(request, project_id or None)
+    return [
+        _auto_rule_out(rule)
+        for rule in AutoSweepRule.objects.filter(project=project)
+        .select_related("network")
+        .order_by("created_at")
+    ]
+
+
+@dashboard_router.delete(
+    "/auto-sweep-rules/{rule_id}", response={200: dict, 403: dict, 404: dict}
+)
+def delete_auto_rule(request, rule_id: str):
+    rule = AutoSweepRule.objects.filter(id=rule_id).select_related("project").first()
+    if rule is None:
+        raise HttpError(404, "rule not found")
+    resolve_project(request, str(rule.project_id))
+    if _role(request, rule.project) not in services.ENDPOINT_ADMIN_ROLES:
+        raise HttpError(403, "auto-sweep rules require an owner or administrator")
+    rule.delete()
+    return {"detail": "deleted"}
 
 
 def _serialize_sweep(sweep: Sweep) -> dict:

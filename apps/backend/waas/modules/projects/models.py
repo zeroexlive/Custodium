@@ -18,6 +18,10 @@ class Project(models.Model):
     )
     name = models.CharField(max_length=200)
     environment = models.CharField(max_length=16, choices=Environment.choices)
+    # When true, withdrawal creation refuses destinations that are
+    # not in the project's destination address book (addressbook
+    # module). Default off: the book is then purely informational.
+    withdrawal_allowlist_required = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="created_projects"
     )
