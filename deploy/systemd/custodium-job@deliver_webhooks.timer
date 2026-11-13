@@ -1,0 +1,12 @@
+# Timer for custodium-job@deliver_webhooks.service — Webhook delivery attempts
+[Unit]
+Description=Run deliver_webhooks every 30s
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30s
+RandomizedDelaySec=5s
+Unit=custodium-job@deliver_webhooks.service
+
+[Install]
+WantedBy=timers.target

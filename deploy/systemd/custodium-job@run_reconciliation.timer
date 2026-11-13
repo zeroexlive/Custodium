@@ -1,0 +1,12 @@
+# Timer for custodium-job@run_reconciliation.service — Ledger vs chain reconciliation (any imbalance must page)
+[Unit]
+Description=Run run_reconciliation every 10min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+RandomizedDelaySec=5s
+Unit=custodium-job@run_reconciliation.service
+
+[Install]
+WantedBy=timers.target

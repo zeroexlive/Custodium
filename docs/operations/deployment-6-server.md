@@ -1,5 +1,9 @@
 # Tutorial — Six-Server Deployment (minimum production topology)
 
+> **Superseded** by [installation-production.md](installation-production.md) (2026-11-13) — kept for
+> history; follow the new tutorial.
+
+
 This tutorial deploys Custodium across **six servers**: the smallest
 topology that preserves the platform's trust boundaries
 (`docs/architecture/deployment-topology.md`,

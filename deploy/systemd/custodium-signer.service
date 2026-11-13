@@ -1,0 +1,41 @@
+# Custodium MPC signer node (S4/S5/S6 — one unit per participant
+# host, with that host's own env file and store key).
+#
+# The store directory and the store key file are the node's
+# crown jewels: the encrypted shares are useless without the
+# key file and vice versa. Keep them on separate backup media
+# under this participant domain's own custody, and never let
+# either leave the host except through the backup procedure in
+# docs/operations/installation-production.md.
+#
+# Install:
+#   sudo cp deploy/systemd/custodium-signer.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now custodium-signer
+[Unit]
+Description=Custodium MPC signer node
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=custodium-signer
+Group=custodium-signer
+EnvironmentFile=/etc/custodium/signer.env
+ExecStart=/usr/local/bin/custodium-signer
+Restart=always
+RestartSec=5
+# The signer needs write access to its store dir only.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/custodium-signer
+ProtectHome=true
+# A signer that cannot reach its peers simply fails ceremonies
+# closed; it must never be reachable from the public internet.
+IPAddressDeny=any
+IPAddressAllow=127.0.0.1
+# Add one IPAddressAllow line per peer/coordinator private IP, e.g.
+# IPAddressAllow=10.0.3.11
+
+[Install]
+WantedBy=multi-user.target

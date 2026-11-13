@@ -133,7 +133,7 @@ cd Custodium
 bash scripts/install.sh         # --dry-run previews, --yes accepts defaults
 ```
 
-Tutorial: [`docs/operations/deployment-1-server-dev.md`](docs/operations/deployment-1-server-dev.md).
+Tutorial: [`docs/operations/installation-dev.md`](docs/operations/installation-dev.md) (development) and [`docs/operations/installation-production.md`](docs/operations/installation-production.md) (production).
 Manual equivalent:
 
 ```bash
@@ -282,8 +282,8 @@ infrastructure/   Deployment assets
 Start with the [product requirements](docs/prd/product-requirements.md),
 the [roadmap & phase records](docs/roadmap/backlog.md), and the
 [operations runbooks](docs/operations/) — including the deployment
-tutorials: [one-server development](docs/operations/deployment-1-server-dev.md)
-and the [six-server minimum production topology](docs/operations/deployment-6-server.md).
+tutorials: [development installation](docs/operations/installation-dev.md)
+and the [production installation (six-server minimum topology)](docs/operations/installation-production.md), with copy-ready units under [`deploy/`](deploy/).
 `AGENTS.md` carries the binding
 contribution rules and the append-only engineering history — every work
 session records what was done, what was actually verified, and what remains.

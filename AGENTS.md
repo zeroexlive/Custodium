@@ -1226,3 +1226,46 @@ a separate written approval decision; neither exists.
   (pyotp is the RFC 6238 reference implementation path and the
   tests compute codes with it), live anything. Status gates
   unchanged: NOT Production Approved.
+
+### 2026-11-13 — Installation tutorials rewritten (dev + production) with deploy/ examples (William's request)
+
+- New canonical tutorials: `docs/operations/installation-dev.md`
+  (paths: installer / Compose / native local / local signer
+  cluster with dev keys + rehearsal script; first-run walkthrough
+  incl. provisioning and 2FA; workers on demand; the register-500
+  troubleshooting carried over) and
+  `docs/operations/installation-production.md` (six servers;
+  S3 data, S1 app with full env inventory + RPC settings overlay
+  example — endpoints are Django settings dicts per slug, S2
+  workers via systemd, S4–S6 signer nodes with per-node store
+  key generation, backups for BOTH the database and signer
+  store+key pairs, a GATED activation step that lists the review/
+  pentest/legal/ceremony/approval preconditions before the gate
+  env is set, go-live checklist, upgrade/rollback with
+  one-signer-node-at-a-time rule). The two 2026-11-12 tutorials
+  now carry "Superseded" pointers (the 6-server one falsely said
+  signer binaries do not ship yet); README links updated.
+- New `deploy/` examples the tutorials reference:
+  systemd units (custodium-api, custodium-indexer@ per network,
+  custodium-job@ + six concrete timers with the cadences incl.
+  run_auto_sweeps 1min and generate_invoices daily,
+  custodium-signer with ProtectSystem=strict + IP allow-listing
+  scaffold), `deploy/run-job.sh` (job-name → management command),
+  nginx site (dashboard dist + /api proxy + TLS), env examples
+  (backend incl. the commented-out signer gate; per-node signer
+  env).
+- Verification: every management command named in the docs was
+  checked to exist (10/10); `bash -n deploy/run-job.sh`;
+  `systemd-analyze verify` parsed all units (only the expected
+  deploy-user uv path note on this VM); a real
+  `cargo build -p custodium-signer-service` run SUCCEEDED —
+  which caught and fixed a wrong package name
+  (`-p signer_service` would have failed) in both new tutorials,
+  the rehearsal doc, and the rehearsal driver's hint text.
+- NOT verified: a live install on real servers or Docker
+  (no Docker/systemd host available in the dev VM) — the
+  tutorials are written from the verified code paths, command
+  inventory, settings, and the executed rehearsal, and are
+  labelled accordingly where a step is operator judgment.
+  Production status unchanged: NOT Production Approved; the
+  production tutorial installs with the signer gate closed.

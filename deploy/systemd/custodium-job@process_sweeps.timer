@@ -1,0 +1,12 @@
+# Timer for custodium-job@process_sweeps.service — Sweep resolution and execution
+[Unit]
+Description=Run process_sweeps every 30s
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30s
+RandomizedDelaySec=5s
+Unit=custodium-job@process_sweeps.service
+
+[Install]
+WantedBy=timers.target

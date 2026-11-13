@@ -1,0 +1,12 @@
+# Timer for custodium-job@process_withdrawals.service — Withdrawal dispatch and status refresh
+[Unit]
+Description=Run process_withdrawals every 15s
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15s
+RandomizedDelaySec=5s
+Unit=custodium-job@process_withdrawals.service
+
+[Install]
+WantedBy=timers.target

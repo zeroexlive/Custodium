@@ -1,0 +1,27 @@
+# Custodium chain indexer for one network (S2 worker tier).
+# The instance name is the network slug, e.g.:
+#   sudo systemctl enable --now custodium-indexer@ethereum
+#   sudo systemctl enable --now custodium-indexer@ethereum-sepolia
+# One instance per network you serve. The command scans until it
+# is caught up, exits, and systemd restarts it after a pause —
+# every pass is idempotent and resumes from stored cursors.
+[Unit]
+Description=Custodium indexer for %i
+After=network.target
+
+[Service]
+Type=simple
+User=custodium
+Group=custodium
+WorkingDirectory=/srv/custodium/apps/backend
+EnvironmentFile=/srv/custodium/.env
+ExecStart=/home/custodium/.local/bin/uv run python manage.py run_indexer --network %i --until-caught-up
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
