@@ -12,7 +12,7 @@ gate for enabling the signer in any real environment.
 ## Run it
 
 Prerequisites: the signer binary built
-(`cargo build -p signer_service` in `services/mpc/`) and the
+(`cargo build -p custodium-signer-service` in `services/mpc/`) and the
 backend venv installed (`uv sync` in `apps/backend/`).
 
 ```bash

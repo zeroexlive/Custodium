@@ -1,0 +1,25 @@
+# Custodium API (S1 application tier). Install:
+#   sudo cp deploy/systemd/custodium-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now custodium-api
+[Unit]
+Description=Custodium WaaS API (gunicorn)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=custodium
+Group=custodium
+WorkingDirectory=/srv/custodium/apps/backend
+EnvironmentFile=/srv/custodium/.env
+ExecStart=/home/custodium/.local/bin/uv run gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 3 --timeout 60 --access-logfile - --error-logfile -
+Restart=always
+RestartSec=5
+# Hardening (the API needs no writable paths beyond /tmp).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

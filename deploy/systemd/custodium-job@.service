@@ -1,0 +1,19 @@
+# Custodium periodic job (S2 worker tier), driven by the
+# matching custodium-job@<name>.timer unit. The instance name is
+# the job key understood by deploy/run-job.sh, e.g.
+# custodium-job@process_withdrawals.service.
+[Unit]
+Description=Custodium periodic job %i
+After=network.target
+
+[Service]
+Type=oneshot
+User=custodium
+Group=custodium
+WorkingDirectory=/srv/custodium/apps/backend
+EnvironmentFile=/srv/custodium/.env
+ExecStart=/srv/custodium/deploy/run-job.sh %i
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true

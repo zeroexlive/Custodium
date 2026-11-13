@@ -1,5 +1,9 @@
 # Tutorial — One-Server Development Deployment
 
+> **Superseded** by [installation-dev.md](installation-dev.md) (2026-11-13) — kept for
+> history; follow the new tutorial.
+
+
 The complete Custodium stack on a **single server**: PostgreSQL,
 Redis, the Temporal development server, the Django API, the Vue
 dashboard, and the worker commands. This is the right topology for

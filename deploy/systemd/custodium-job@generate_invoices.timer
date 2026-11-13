@@ -1,0 +1,12 @@
+# Timer for custodium-job@generate_invoices.service — Plan invoicing (fiat, off-platform collection)
+[Unit]
+Description=Run generate_invoices every 1day
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1day
+RandomizedDelaySec=5s
+Unit=custodium-job@generate_invoices.service
+
+[Install]
+WantedBy=timers.target

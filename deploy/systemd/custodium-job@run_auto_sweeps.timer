@@ -1,0 +1,12 @@
+# Timer for custodium-job@run_auto_sweeps.service — Auto-sweep rule evaluation
+[Unit]
+Description=Run run_auto_sweeps every 1min
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=5s
+Unit=custodium-job@run_auto_sweeps.service
+
+[Install]
+WantedBy=timers.target

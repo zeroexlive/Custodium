@@ -122,7 +122,7 @@ def main() -> int:
     RUN_DIR.mkdir(parents=True)
     print(f"rehearsal dir: {RUN_DIR}")
     if not SIGNER_BIN.exists():
-        print(f"signer binary missing: {SIGNER_BIN} (build: cargo build -p signer_service)")
+        print(f"signer binary missing: {SIGNER_BIN} (build: cargo build -p custodium-signer-service)")
         return 1
     checks: dict[str, object] = {}
     try:
