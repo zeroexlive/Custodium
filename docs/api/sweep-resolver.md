@@ -267,3 +267,18 @@ timestamps — never with signing secrets. Repeated resolution
 failures alert operations and the tenant; a destination that
 changes between consecutive sweeps is surfaced in the dashboard
 as a high-salience event, because legitimate changes are rare.
+
+---
+
+## Amendment — static destinations (2026-11-13)
+
+Per the amendment recorded in ADR 0006, a project may instead
+set `SweepPolicy.destination_mode = "static"` and register one
+static hot-wallet address per network
+(`PUT /sweep-destinations`, owner/administrator; validated and
+normalized per network family). Sweeps then snapshot that
+address — same immutable snapshot, same fail-closed behaviour,
+`source = "static"` — and the resolver endpoint is not called.
+The mode is per project; the default remains `resolver`, and
+§1's prohibitions on destinations in sweep requests or files
+are unchanged in both modes.

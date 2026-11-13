@@ -23,7 +23,13 @@ from waas.modules.projects.models import Project
 from waas.modules.wallets.models import Wallet
 
 from .. import resolver, services
-from ..models import AutoSweepRule, Sweep, SweepDestinationEndpoint
+from ..models import (
+    AutoSweepRule,
+    StaticSweepDestination,
+    Sweep,
+    SweepDestinationEndpoint,
+    SweepPolicy,
+)
 
 router = Router(tags=["sweeps"], auth=AnyAuth())
 dashboard_router = Router(tags=["sweeps-dashboard"], auth=DashboardAuth())
@@ -235,6 +241,126 @@ def delete_auto_rule(request, rule_id: str):
     if _role(request, rule.project) not in services.ENDPOINT_ADMIN_ROLES:
         raise HttpError(403, "auto-sweep rules require an owner or administrator")
     rule.delete()
+    return {"detail": "deleted"}
+
+
+class SweepPolicyIn(Schema):
+    project_id: str
+    destination_mode: str = "resolver"
+    min_sweep_threshold: str = "0"
+    leave_behind: str = "0"
+    enabled: bool = True
+
+
+def _policy_out(policy: SweepPolicy) -> dict:
+    return {
+        "project_id": str(policy.project_id),
+        "destination_mode": policy.destination_mode,
+        "min_sweep_threshold": str(int(policy.min_sweep_threshold)),
+        "leave_behind": str(int(policy.leave_behind)),
+        "enabled": policy.enabled,
+    }
+
+
+@dashboard_router.get("/sweep-policy", response={200: dict, 404: dict})
+def get_sweep_policy(request, project_id: str):
+    project = resolve_project(request, project_id)
+    policy = SweepPolicy.objects.filter(project=project).first()
+    if policy is None:
+        policy = SweepPolicy(project=project)
+    return _policy_out(policy)
+
+
+@dashboard_router.put(
+    "/sweep-policy", response={200: dict, 403: dict, 404: dict, 422: dict}
+)
+def put_sweep_policy(request, payload: SweepPolicyIn):
+    project = resolve_project(request, payload.project_id)
+    if _role(request, project) not in services.ENDPOINT_ADMIN_ROLES:
+        raise HttpError(403, "sweep policy requires an owner or administrator")
+    if payload.destination_mode not in ("resolver", "static"):
+        raise HttpError(422, "destination_mode must be 'resolver' or 'static'")
+    try:
+        threshold = int(payload.min_sweep_threshold)
+        leave_behind = int(payload.leave_behind)
+    except ValueError as exc:
+        raise HttpError(422, "amounts must be integers (base units)") from exc
+    if threshold < 0 or leave_behind < 0:
+        raise HttpError(422, "amounts cannot be negative")
+    policy, _ = SweepPolicy.objects.update_or_create(
+        project=project,
+        defaults={
+            "destination_mode": payload.destination_mode,
+            "min_sweep_threshold": threshold,
+            "leave_behind": leave_behind,
+            "enabled": payload.enabled,
+        },
+    )
+    return _policy_out(policy)
+
+
+class StaticDestinationIn(Schema):
+    project_id: str
+    network: str
+    address: str
+    label: str = ""
+
+
+def _destination_out(destination: StaticSweepDestination) -> dict:
+    return {
+        "id": str(destination.id),
+        "project_id": str(destination.project_id),
+        "network": destination.network.slug,
+        "address": destination.address,
+        "label": destination.label,
+        "enabled": destination.enabled,
+    }
+
+
+@dashboard_router.put(
+    "/sweep-destinations", response={200: dict, 403: dict, 404: dict, 422: dict}
+)
+def put_static_destination(request, payload: StaticDestinationIn):
+    project = resolve_project(request, payload.project_id)
+    if _role(request, project) not in services.ENDPOINT_ADMIN_ROLES:
+        raise HttpError(403, "static destinations require an owner or administrator")
+    network = BlockchainNetwork.objects.filter(slug=payload.network).first()
+    if network is None:
+        raise HttpError(422, "unknown network")
+    try:
+        destination = services.set_static_destination(
+            project=project, network=network, address=payload.address,
+            label=payload.label, actor=request.actor,
+        )
+    except services.SweepError as exc:
+        raise HttpError(422, str(exc)) from exc
+    return _destination_out(destination)
+
+
+@dashboard_router.get("/sweep-destinations", response={200: list[dict], 404: dict})
+def list_static_destinations(request, project_id: str):
+    project = resolve_project(request, project_id)
+    return [
+        _destination_out(row)
+        for row in StaticSweepDestination.objects.filter(project=project).select_related("network")
+    ]
+
+
+@dashboard_router.delete(
+    "/sweep-destinations/{destination_id}", response={200: dict, 403: dict, 404: dict}
+)
+def delete_static_destination(request, destination_id: str):
+    destination = (
+        StaticSweepDestination.objects.filter(id=destination_id)
+        .select_related("project")
+        .first()
+    )
+    if destination is None:
+        raise HttpError(404, "destination not found")
+    resolve_project(request, str(destination.project_id))
+    if _role(request, destination.project) not in services.ENDPOINT_ADMIN_ROLES:
+        raise HttpError(403, "static destinations require an owner or administrator")
+    destination.delete()
     return {"detail": "deleted"}
 
 

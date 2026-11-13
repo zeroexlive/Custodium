@@ -46,7 +46,11 @@ WaaS products are compared on). Status meanings:
 | **Destination address book + optional withdrawal allowlist enforcement** | **Added 2026-11-13** | `/address-book`, `/address-book/policy`; enforced beside the blacklist check in withdrawal creation |
 | Manual blacklist (never an AML/KYT claim) | Available | blacklist |
 | Service fee + actual network fee accounting | Available | operations |
-| Sweeps via tenant resolver endpoint only, immutable snapshots | Available | sweeps (ADR 0006 — no destination in requests, ever) |
+| Sweeps via tenant resolver endpoint, immutable snapshots | Available | sweeps (ADR 0006 — no destination in requests, ever) |
+| **Static hot-wallet destinations (manual mode, per project + network)** | **Added 2026-11-13** | `SweepPolicy.destination_mode=static`, `/sweep-destinations`, `/sweep-policy`; ADR 0006 amended by the owner — request-side prohibitions unchanged |
+| **Deposit minimum per project + asset (held deposits accumulate until they reach it; no maximum by design)** | **Added 2026-11-13** | indexing `DepositPolicy`, `/deposit-policies`; enforced in the shared confirmation pass |
+| **Withdrawal minimum (`min_single_amount`, beside the existing max/daily limits)** | **Added 2026-11-13** | operations policy API + creation enforcement |
+| **Gas-station top-up address surfaced in the API** | **Added 2026-11-13** | `GET /gas-stations` returns `top_up_address` (the funding wallet's address on that network) |
 | **Auto-sweep rules (balance-threshold triggers)** | **Added 2026-11-13** | `/auto-sweep-rules`, `run_auto_sweeps` command; sweeps still flow through resolver + policy + approvals |
 | Gas station (native-balance top-ups that defer, never fail) | Available | gasstation |
 | Refund playbook, reconciliation halts, platform kill switch | Available | operations, hardening |

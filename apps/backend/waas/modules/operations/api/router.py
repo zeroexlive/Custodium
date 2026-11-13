@@ -50,6 +50,7 @@ class RefundIn(Schema):
 
 class PolicyIn(Schema):
     asset_id: str | None = None
+    min_single_amount: str | None = None
     max_single_amount: str | None = None
     daily_limit: str | None = None
     approvals_required: int = 1
@@ -237,6 +238,9 @@ def get_policy(request, project_id: str, asset_id: str | None = None):
     )
     return {
         "approvals_required": policy.approvals_required,
+        "min_single_amount": (
+            str(int(policy.min_single_amount)) if policy.min_single_amount is not None else None
+        ),
         "max_single_amount": (
             str(int(policy.max_single_amount)) if policy.max_single_amount is not None else None
         ),
@@ -263,6 +267,9 @@ def put_policy(request, project_id: str, payload: PolicyIn):
         project=project,
         asset=asset,
         defaults={
+            "min_single_amount": (
+                int(payload.min_single_amount) if payload.min_single_amount else None
+            ),
             "max_single_amount": (
                 int(payload.max_single_amount) if payload.max_single_amount else None
             ),
@@ -274,6 +281,9 @@ def put_policy(request, project_id: str, payload: PolicyIn):
     )
     return {
         "approvals_required": policy.approvals_required,
+        "min_single_amount": (
+            str(int(policy.min_single_amount)) if policy.min_single_amount is not None else None
+        ),
         "max_single_amount": (
             str(int(policy.max_single_amount)) if policy.max_single_amount is not None else None
         ),

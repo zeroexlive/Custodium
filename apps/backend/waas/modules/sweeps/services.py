@@ -32,6 +32,7 @@ from . import resolver
 from .models import (
     AutoSweepRule,
     ResolvedDestinationSnapshot,
+    StaticSweepDestination,
     Sweep,
     SweepApproval,
     SweepDestinationEndpoint,
@@ -327,45 +328,75 @@ def process_sweep(
     if sweep.status == Sweep.Status.CREATED:
         sweep.status = Sweep.Status.RESOLVING
         sweep.save(update_fields=["status", "updated_at"])
-        endpoint = get_endpoint(sweep.project)
-        if endpoint is None:
-            return _fail(sweep, Sweep.Status.RESOLUTION_FAILED, "no endpoint registered")
-        if not endpoint.enabled:
-            return _fail(sweep, Sweep.Status.RESOLUTION_FAILED, "endpoint disabled")
-        secret = (
-            decrypt_secret(endpoint.signing_secret_ciphertext)
-            if endpoint.signing_secret_ciphertext
-            else ""
-        )
         request_id = f"swp:{sweep.id}"
-        try:
-            result = resolver.resolve_destination(
-                endpoint_url=endpoint.url,
-                signing_secret=secret,
-                network=sweep.network,
-                asset=sweep.asset,
-                request_id=request_id,
-                **resolver_kwargs,
-            )
-        except resolver.ResolutionError as exc:
-            AuditEvent.record(
-                "sweep.resolution_failed",
-                actor_user=None,
-                organization=sweep.project.organization,
-                project=sweep.project,
-                metadata={"sweep": str(sweep.id), "stage": exc.stage, "error": exc.message},
-            )
-            return _fail(
-                sweep, Sweep.Status.RESOLUTION_FAILED, f"{exc.stage}: {exc.message}"
-            )
-        ResolvedDestinationSnapshot.objects.create(
-            sweep=sweep,
-            destination_address=result.address,
-            normalized_address=result.normalized,
-            endpoint_url_hash=_url_hash(endpoint.url),
-            request_id=request_id,
-            raw_body_sha256=result.raw_body_sha256,
+        policy = SweepPolicy.objects.filter(project=sweep.project).first()
+        mode = (
+            policy.destination_mode
+            if policy is not None
+            else SweepPolicy.DestinationMode.RESOLVER
         )
+        if mode == SweepPolicy.DestinationMode.STATIC:
+            # Manual mode (ADR 0006 as amended 2026-11-13): the
+            # destination is the tenant-registered static
+            # hot-wallet address for this network. Same guarantees
+            # as the resolver path: registered configuration only,
+            # immutable snapshot, fail closed when absent/invalid.
+            result = _resolve_static(sweep)
+            if isinstance(result, Sweep):
+                return result
+            ResolvedDestinationSnapshot.objects.create(
+                sweep=sweep,
+                destination_address=result.address,
+                normalized_address=result.normalized,
+                endpoint_url_hash=_url_hash(
+                    f"static:{sweep.project_id}:{sweep.network.slug}"
+                ),
+                request_id=request_id,
+                raw_body_sha256=hashlib.sha256(
+                    result.normalized.encode()
+                ).hexdigest(),
+                source="static",
+            )
+        else:
+            endpoint = get_endpoint(sweep.project)
+            if endpoint is None:
+                return _fail(sweep, Sweep.Status.RESOLUTION_FAILED, "no endpoint registered")
+            if not endpoint.enabled:
+                return _fail(sweep, Sweep.Status.RESOLUTION_FAILED, "endpoint disabled")
+            secret = (
+                decrypt_secret(endpoint.signing_secret_ciphertext)
+                if endpoint.signing_secret_ciphertext
+                else ""
+            )
+            try:
+                result = resolver.resolve_destination(
+                    endpoint_url=endpoint.url,
+                    signing_secret=secret,
+                    network=sweep.network,
+                    asset=sweep.asset,
+                    request_id=request_id,
+                    **resolver_kwargs,
+                )
+            except resolver.ResolutionError as exc:
+                AuditEvent.record(
+                    "sweep.resolution_failed",
+                    actor_user=None,
+                    organization=sweep.project.organization,
+                    project=sweep.project,
+                    metadata={"sweep": str(sweep.id), "stage": exc.stage, "error": exc.message},
+                )
+                return _fail(
+                    sweep, Sweep.Status.RESOLUTION_FAILED, f"{exc.stage}: {exc.message}"
+                )
+            ResolvedDestinationSnapshot.objects.create(
+                sweep=sweep,
+                destination_address=result.address,
+                normalized_address=result.normalized,
+                endpoint_url_hash=_url_hash(endpoint.url),
+                request_id=request_id,
+                raw_body_sha256=result.raw_body_sha256,
+                source="resolver",
+            )
         sweep.status = Sweep.Status.RESOLVED
         sweep.save(update_fields=["status", "updated_at"])
         # Policy checks against the snapshot (§8.2).
@@ -553,3 +584,95 @@ def record_sweep_approval(*, sweep: Sweep, approver, decision: str, note: str = 
         sweep.status = Sweep.Status.RESOLVED
         sweep.save(update_fields=["status", "updated_at"])
     return sweep
+
+
+# ------------------------------------------------------- static destinations
+
+class _StaticResult:
+    """Duck-typed resolver result for the static path."""
+
+    def __init__(self, address: str, normalized: str) -> None:
+        self.address = address
+        self.normalized = normalized
+
+
+def set_static_destination(
+    *, project: Project, network: BlockchainNetwork, address: str,
+    label: str = "", actor=None,
+) -> StaticSweepDestination:
+    """Register/replace the static hot-wallet address for one
+    (project, network). The address is validated and normalized
+    for the network's family exactly like an address-book entry;
+    invalid addresses are refused, never stored."""
+    from waas.common.address_normalization import family_for_slug, normalize_address
+
+    try:
+        normalized = normalize_address(family_for_slug(network.slug), address)
+    except ValueError as exc:
+        raise SweepError(f"invalid address for network {network.slug}: {exc}") from exc
+    destination, _created = StaticSweepDestination.objects.update_or_create(
+        project=project,
+        network=network,
+        defaults={
+            "address": address,
+            "normalized_address": normalized,
+            "label": label,
+            "enabled": True,
+            "created_by": actor,
+        },
+    )
+    AuditEvent.record(
+        "sweep.static_destination_set",
+        actor_user=actor,
+        organization=project.organization,
+        project=project,
+        metadata={"network": network.slug, "address": address},
+    )
+    return destination
+
+
+def _resolve_static(sweep: Sweep):
+    """The static-mode resolution step of process_sweep: returns
+    a _StaticResult, or the failed Sweep (via _fail) when no
+    usable destination is registered — fail closed, exactly like
+    a resolver failure, with no fallback to the endpoint."""
+    from waas.common.address_normalization import family_for_slug, normalize_address
+
+    destination = StaticSweepDestination.objects.filter(
+        project=sweep.project, network=sweep.network
+    ).first()
+    if destination is None:
+        return _fail(
+            sweep, Sweep.Status.RESOLUTION_FAILED,
+            "no static destination registered for this network",
+        )
+    if not destination.enabled:
+        return _fail(
+            sweep, Sweep.Status.RESOLUTION_FAILED, "static destination disabled"
+        )
+    try:
+        normalized = normalize_address(
+            family_for_slug(sweep.network.slug), destination.address
+        )
+    except ValueError as exc:
+        return _fail(
+            sweep, Sweep.Status.RESOLUTION_FAILED,
+            f"static destination invalid: {exc}",
+        )
+    if normalized != destination.normalized_address:
+        return _fail(
+            sweep, Sweep.Status.RESOLUTION_FAILED,
+            "static destination failed re-validation",
+        )
+    AuditEvent.record(
+        "sweep.destination_static",
+        actor_user=None,
+        organization=sweep.project.organization,
+        project=sweep.project,
+        metadata={
+            "sweep": str(sweep.id),
+            "network": sweep.network.slug,
+            "address": destination.address,
+        },
+    )
+    return _StaticResult(destination.address, normalized)

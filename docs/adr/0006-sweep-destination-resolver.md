@@ -173,3 +173,37 @@ Re-open this ADR if any of the following occurs:
   endpoints) is introduced or changed.
 - Before Phase 10 implementation AND again before ANY production
   approval — re-review SSRF defences, change control, and snapshot immutability with penetration-test evidence.
+
+---
+
+## Amendment — 2026-11-13 (owner's direction)
+
+The resolver endpoint remains the **default and recommended**
+destination source. At the product owner's explicit direction, a
+second tenant-registered source is now permitted: a **static
+hot-wallet address per (project, network)**, registered through
+the dashboard API by an owner/administrator
+(`StaticSweepDestination`), selected per project via
+`SweepPolicy.destination_mode = "static"`.
+
+What does NOT change — the invariants this ADR exists for:
+
+- A sweep request still **never** carries a destination; the API
+  still rejects destination fields with 422.
+- The destination is still **tenant-registered configuration
+  only** (PostgreSQL, role-gated, audited) — never a file, env
+  var, seed, or per-request value.
+- Resolution still happens **exactly once, before approval**,
+  and the result is stored in the same **immutable**
+  `ResolvedDestinationSnapshot` (now carrying `source =
+  "resolver" | "static"`); signing uses the snapshot only.
+- Absent or invalid static destinations **fail closed** with
+  `RESOLUTION_FAILED`; there is no fallback between modes.
+
+Rationale for the amendment: some tenants operate a fixed hot
+wallet per chain and cannot run a resolver endpoint. The static
+mode serves them without weakening the request-side rule — the
+attack this ADR defends against (destination injection via a
+compromised API key or a swapped file) remains impossible,
+because changing a static destination requires an
+owner/administrator dashboard session and is audit-logged.

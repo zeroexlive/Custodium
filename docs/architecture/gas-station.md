@@ -58,7 +58,10 @@ pipeline runs:
    cap; a confirmed top-up that still leaves the balance below the
    threshold defers with a manual-review reason instead of looping.
 
-**Configuration.** Dashboard-only API (`GET/PUT /gas-stations`,
+**Configuration.** Dashboard-only API (`GET/PUT /gas-stations`;
+responses include `top_up_address` — the funding wallet's
+address on the station's network, which is where the client
+sends native coin to fund the station (added 2026-11-13),
 `GET /gas-stations/topups`), owner/administrator role; the funding
 wallet must belong to the same project (422 otherwise). The
 dashboard gains a **Gas Station** view: station form, configured

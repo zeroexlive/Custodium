@@ -65,7 +65,20 @@ class SweepEndpointHistory(models.Model):
 class SweepPolicy(models.Model):
     """Per-project sweep policy: sweep the wallet scope's
     available balance down to `leave_behind`, only when the
-    sweepable amount reaches `min_sweep_threshold`."""
+    sweepable amount reaches `min_sweep_threshold`.
+
+    `destination_mode` (2026-11-13, amending ADR 0006 at the
+    owner's direction): RESOLVER keeps the original rule — the
+    destination comes from the tenant's registered HTTPS
+    resolver endpoint. STATIC uses the tenant-registered static
+    hot-wallet address for the sweep's network
+    (StaticSweepDestination). Either way the destination is
+    tenant-registered configuration, NEVER part of a sweep
+    request, and is snapshotted immutably before approval."""
+
+    class DestinationMode(models.TextChoices):
+        RESOLVER = "resolver"
+        STATIC = "static"
 
     project = models.OneToOneField(
         Project, on_delete=models.CASCADE, related_name="sweep_policy"
@@ -73,7 +86,45 @@ class SweepPolicy(models.Model):
     min_sweep_threshold = models.DecimalField(max_digits=78, decimal_places=0, default=0)
     leave_behind = models.DecimalField(max_digits=78, decimal_places=0, default=0)
     enabled = models.BooleanField(default=True)
+    destination_mode = models.CharField(
+        max_length=16, choices=DestinationMode.choices, default=DestinationMode.RESOLVER
+    )
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class StaticSweepDestination(models.Model):
+    """A tenant-registered static hot-wallet address for one
+    (project, network) — the manual alternative to the resolver
+    endpoint, used only when the project's SweepPolicy is in
+    STATIC mode. Registered through the dashboard API by an
+    owner/administrator; validated and stored normalized exactly
+    like an address-book entry."""
+
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="static_sweep_destinations"
+    )
+    network = models.ForeignKey(
+        BlockchainNetwork, on_delete=models.PROTECT, related_name="static_sweep_destinations"
+    )
+    address = models.CharField(max_length=128)
+    normalized_address = models.CharField(max_length=128, db_index=True)
+    label = models.CharField(max_length=120, blank=True)
+    enabled = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["project", "network"], name="uniq_static_destination_per_network"
+            )
+        ]
+
+    def __str__(self) -> str:  # pragma: no cover - display only
+        return f"StaticSweepDestination({self.project_id}, {self.network.slug})"
 
 
 class AutoSweepRule(models.Model):
@@ -211,6 +262,9 @@ class ResolvedDestinationSnapshot(models.Model):
     request_id = models.CharField(max_length=64)
     raw_body_sha256 = models.CharField(max_length=64)
     resolver_version = models.PositiveSmallIntegerField(default=1)
+    # "resolver" (endpoint) or "static" (registered hot-wallet
+    # address); the hash fields identify the source either way.
+    source = models.CharField(max_length=16, default="resolver")
     resolved_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):

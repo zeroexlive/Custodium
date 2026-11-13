@@ -307,14 +307,66 @@ def _handle_reorg(network: BlockchainNetwork, provider: EvmProvider, cursor: Cha
     return depth
 
 
+BELOW_MINIMUM_HOLD = "below minimum deposit"
+
+
+def minimum_deposit_for(*, project, asset) -> int:
+    """The project's configured deposit minimum for one asset, in
+    integer base units (0 = no minimum). See DepositPolicy."""
+    from waas.modules.indexing.models import DepositPolicy
+
+    policy = DepositPolicy.objects.filter(project=project, asset=asset).first()
+    return int(policy.min_amount) if policy is not None else 0
+
+
 def _confirmation_pass(network: BlockchainNetwork, head: int) -> int:
     required = max(network.confirmations_required, 1)
+    matured = [
+        deposit
+        for deposit in ObservedDeposit.objects.filter(
+            network=network, status=ObservedDeposit.Status.PENDING, held=False
+        ).select_related("wallet", "asset")
+        if head - deposit.block_number + 1 >= required
+    ]
+    # Deposit minimums apply per (wallet, asset): deposits below
+    # the minimum are held and accumulate; once the held pool plus
+    # the newly matured deposits reaches the minimum, everything
+    # is credited together (each deposit keeps its own journal,
+    # so reorg reversal stays per-deposit).
+    groups: dict[tuple, list] = {}
+    for deposit in matured:
+        groups.setdefault((deposit.wallet_id, deposit.asset_id), []).append(deposit)
     credited = 0
-    pending = ObservedDeposit.objects.filter(
-        network=network, status=ObservedDeposit.Status.PENDING, held=False
-    )
-    for deposit in pending:
-        if head - deposit.block_number + 1 >= required:
+    for group in groups.values():
+        first = group[0]
+        minimum = minimum_deposit_for(
+            project=first.wallet.project, asset=first.asset
+        )
+        pool = list(
+            ObservedDeposit.objects.filter(
+                wallet_id=first.wallet_id,
+                asset_id=first.asset_id,
+                status=ObservedDeposit.Status.PENDING,
+                held=True,
+                hold_reason__startswith=BELOW_MINIMUM_HOLD,
+            ).order_by("block_number", "id")
+        )
+        total = sum(int(d.amount) for d in pool) + sum(
+            int(d.amount) for d in group
+        )
+        if minimum > 0 and total < minimum:
+            for deposit in group:
+                deposit.held = True
+                deposit.hold_reason = f"{BELOW_MINIMUM_HOLD} ({minimum})"
+                deposit.save(update_fields=["held", "hold_reason", "updated_at"])
+            continue
+        for deposit in pool:
+            deposit.held = False
+            deposit.hold_reason = ""
+            deposit.save(update_fields=["held", "hold_reason", "updated_at"])
+            _post_credit(deposit)
+            credited += 1
+        for deposit in group:
             _post_credit(deposit)
             credited += 1
     return credited
