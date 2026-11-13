@@ -186,3 +186,9 @@ export interface Invoice {
 export interface OrgMember {
   membership_id: string; user_id: string; email: string; role: string; created_at: string;
 }
+
+export interface AuditLogEntry {
+  id: string; event_type: string;
+  organization_id: string | null; project_id: string | null;
+  metadata: Record<string, unknown>; created_at: string;
+}

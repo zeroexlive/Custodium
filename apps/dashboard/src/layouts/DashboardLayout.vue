@@ -2,13 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import Icon from '@/components/ui/Icon.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const dark = ref(false)
 const navQuery = ref('')
 
-interface NavItem { to: string; label: string }
+interface NavItem { to: string; label: string; icon: string }
 interface NavGroup { title: string; items: NavItem[] }
 
 /** Our own section names (Custodium domain), grouped like the reference layout. */
@@ -16,38 +17,37 @@ const groups: NavGroup[] = [
   {
     title: 'Main Menu',
     items: [
-      { to: '/', label: 'Overview' },
-      { to: '/organizations', label: 'Organizations' },
-      { to: '/projects', label: 'Projects' },
-      { to: '/api-keys', label: 'API Keys' },
-      { to: '/security', label: 'Security' },
+      { to: '/', label: 'Overview', icon: 'grid' },
+      { to: '/organizations', label: 'Organizations', icon: 'building' },
+      { to: '/projects', label: 'Projects', icon: 'folder' },
+      { to: '/api-keys', label: 'API Keys', icon: 'key' },
+      { to: '/security', label: 'Security', icon: 'shield' },
     ],
   },
   {
     title: 'Wallets & Activity',
     items: [
-      { to: '/wallets', label: 'Wallets' },
-      { to: '/addresses', label: 'Addresses' },
-      { to: '/transactions', label: 'Transaction Explorer' },
-      { to: '/assets', label: 'Assets & Networks' },
-      { to: '/sweeps', label: 'Sweeps' },
-      { to: '/sweep-endpoint', label: 'Sweep Endpoint' },
-      { to: '/sweep-settings', label: 'Sweep Settings' },
-      { to: '/address-book', label: 'Address Book' },
-      { to: '/deposit-policies', label: 'Deposit Policies' },
-      { to: '/gas-station', label: 'Gas Station' },
+      { to: '/wallets', label: 'Wallets', icon: 'wallet' },
+      { to: '/addresses', label: 'Addresses', icon: 'pin' },
+      { to: '/transactions', label: 'Transaction Explorer', icon: 'search' },
+      { to: '/assets', label: 'Assets & Networks', icon: 'coins' },
+      { to: '/sweeps', label: 'Sweeps', icon: 'refresh' },
+      { to: '/sweep-endpoint', label: 'Sweep Endpoint', icon: 'signal' },
+      { to: '/sweep-settings', label: 'Sweep Settings', icon: 'sliders' },
+      { to: '/address-book', label: 'Address Book', icon: 'book' },
+      { to: '/deposit-policies', label: 'Deposit Policies', icon: 'clipboard' },
+      { to: '/gas-station', label: 'Gas Station', icon: 'fuel' },
     ],
   },
   {
     title: 'General',
     items: [
-      { to: '/blacklist', label: 'Blacklist' },
-      { to: '/withdrawals', label: 'Withdrawals' },
-      { to: '/webhooks', label: 'Webhooks' },
-      { to: '/team', label: 'Team' },
-      { to: '/billing', label: 'Billing' },
-      { to: '/webhooks', label: 'Webhooks' },
-      { to: '/audit', label: 'Audit Logs' },
+      { to: '/blacklist', label: 'Blacklist', icon: 'ban' },
+      { to: '/withdrawals', label: 'Withdrawals', icon: 'arrow-up-circle' },
+      { to: '/webhooks', label: 'Webhooks', icon: 'webhook' },
+      { to: '/team', label: 'Team', icon: 'users' },
+      { to: '/billing', label: 'Billing', icon: 'card' },
+      { to: '/audit', label: 'Audit Logs', icon: 'file' },
     ],
   },
 ]
@@ -78,11 +78,11 @@ async function logout(): Promise<void> { await auth.logout(); await router.push(
       <aside class="shrink-0 text-ink md:w-72 md:border-r md:border-black/5" aria-label="Primary">
         <div class="flex items-center justify-between px-5 pt-6 pb-4">
           <span class="flex items-center gap-2.5 text-xl font-bold tracking-tight">
-            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 font-black text-white shadow-card" aria-hidden="true">C</span>
+            <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-card" aria-hidden="true"><Icon name="shield" :size="20" /></span>
             Custodium
           </span>
           <button type="button" class="rounded-full bg-surface-muted px-3 py-1.5 text-xs font-medium text-ink-muted" :aria-pressed="dark" aria-label="Toggle dark mode" @click="toggleTheme">
-            {{ dark ? '☀ Light' : '☾ Dark' }}
+            <span class="inline-flex items-center gap-1.5"><Icon :name="dark ? 'sun' : 'moon'" :size="14" />{{ dark ? 'Light' : 'Dark' }}</span>
           </button>
         </div>
 
@@ -102,8 +102,9 @@ async function logout(): Promise<void> { await auth.logout(); await router.push(
             <ul class="space-y-1">
               <li v-for="item in group.items" :key="item.to">
                 <RouterLink :to="item.to"
-                  class="block rounded-xl px-3.5 py-2.5 text-sm text-ink-muted transition hover:bg-surface-muted hover:text-ink"
+                  class="flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-sm text-ink-muted transition hover:bg-surface-muted hover:text-ink"
                   active-class="!bg-gray-900 !text-white font-medium shadow-card dark:!bg-white dark:!text-gray-900">
+                  <Icon :name="item.icon" :size="18" />
                   {{ item.label }}
                 </RouterLink>
               </li>
@@ -118,7 +119,7 @@ async function logout(): Promise<void> { await auth.logout(); await router.push(
             <p v-if="auth.user" class="mb-3 truncate text-sm text-ink-muted">{{ auth.user.email }}</p>
             <p v-else class="mb-3 text-sm text-ink-muted">Not signed in</p>
             <button type="button" class="w-full rounded-xl border border-gray-300 bg-surface px-4 py-2 text-sm font-medium transition hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800" @click="logout">
-              Log out
+              <span class="inline-flex items-center justify-center gap-2"><Icon name="logout" :size="16" /> Log out</span>
             </button>
           </div>
         </div>

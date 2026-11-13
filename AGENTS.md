@@ -1378,3 +1378,43 @@ a separate written approval decision; neither exists.
   (no browser-driven run in this environment); backend endpoint
   behaviour itself is covered by the PR #22/#24 test suites.
   Status unchanged: NOT Production Approved.
+
+### 2026-11-14 — Frontend icons + data-driven Overview (William's request)
+
+- Icons: hand-drawn inline SVG set in
+  apps/dashboard/src/components/ui/Icon.vue (24x24 stroke icons,
+  currentColor, no icon dependency): grid, building, folder,
+  key, shield, wallet, pin, search, coins, refresh, signal,
+  sliders, book, fuel, clipboard, ban, arrow-up-circle, webhook,
+  users, card, file, clock, sun, moon, logout, chart. Wired into
+  every sidebar nav item, the logo mark (shield), the theme
+  toggle (sun/moon) and the logout button; also removed a
+  pre-existing duplicate Webhooks nav entry.
+- Charts: dependency-free components in src/components/charts/
+  (BarChart, DonutChart, HBars) with pure math in chartMath.ts
+  (fractionsOfMax, shares, donutSegments, bucketByDay).
+- Overview rewritten from the Phase 1 placeholder into a real
+  operations page — ALL data live from the API, per rule 9:
+  KPI cards (organizations, projects, API keys, wallets in the
+  selected project, awaiting-approval = withdrawals in
+  pending_policy + sweeps in awaiting_approval); project
+  selector (auto-selects the first project); available balances
+  by asset (horizontal bars; display values are the raw base-unit
+  strings, floats used only for proportions); withdrawals by
+  status (donut, case-normalized statuses); platform activity
+  (audit events per day, last 14 UTC days, from GET /audit-logs —
+  the card states it counts the most recent 100 events); plan
+  usage meters (first organization); recent-activity list. The
+  stale "Phase 1" copy is gone; the header pill states the true
+  status (Pre-production · not production approved). Every card
+  has loading, error, and honest empty states.
+- Audit Logs view wired at last: the Phase 11 placeholder is
+  replaced with the real GET /audit-logs table (event type,
+  project, timestamp) + client function listAuditLogs.
+- Verified: npm run build (vue-tsc strict + vite) green;
+  vitest 21 passed (6 new in tests/charts.spec.ts: chart math
+  incl. day bucketing and zero-guards, Icon render smoke test).
+  DESIGN.md gained an Icons & charts section.
+- NOT verified: browser-driven rendering against a live backend
+  (not available in this environment). Status unchanged: NOT
+  Production Approved.
