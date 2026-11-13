@@ -55,3 +55,16 @@ design language:
 `Badge`, `Input`, `EmptyState` in `src/components/ui/` are the only
 places these styles are defined; feature views must use them instead of
 re-styling per page.
+
+## Icons & charts (2026-11-14)
+
+- Icons are a hand-drawn inline SVG set in
+  `src/components/ui/Icon.vue` (24×24 stroke icons, `currentColor`) —
+  no icon library dependency. The sidebar nav, logo mark, theme
+  toggle, and KPI cards use them.
+- Charts are dependency-free SVG components in
+  `src/components/charts/` (BarChart, DonutChart, HBars) with the
+  math in `chartMath.ts` (unit-tested). Per the honesty rule they
+  render ONLY live API data (project balances, withdrawal
+  statuses, audit-event activity, plan usage) with loading,
+  error, and honest empty states — never sample figures.

@@ -1,5 +1,5 @@
 import type {
-  AddressBookEntry, ApiKey, ApiKeyCreated, Asset, AuthResponse, AutoSweepRule, BlacklistCheckResult,
+  AddressBookEntry, ApiKey, ApiKeyCreated, Asset, AuditLogEntry, AuthResponse, AutoSweepRule, BlacklistCheckResult,
   BlacklistEntry, BlacklistScope, DepositPolicy, Network, Organization, Project,
   GasStation, GasTopUp, StaticSweepDestination, SweepPolicy, TotpEnabled, TotpSetup,
   ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
@@ -247,6 +247,10 @@ export const api = {
   // Webhook signing-secret rotation (new secret returned once).
   rotateWebhookSecret: (id: string) =>
     request<{ id: string; signing_secret: string }>('POST', `/webhooks/endpoints/${encodeURIComponent(id)}/rotate-secret`),
+
+  // Audit log — the caller's organizations, most recent 100 events.
+  listAuditLogs: async (): Promise<AuditLogEntry[]> =>
+    listOf(await request<AuditLogEntry[] | { items: AuditLogEntry[] }>('GET', '/audit-logs')),
 
   // Plans & billing (Phase 11)
   listPlans: async () => listOf(await request<Plan[] | { items: Plan[] }>('GET', '/plans')),
