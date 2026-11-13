@@ -76,6 +76,54 @@ class SweepPolicy(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class AutoSweepRule(models.Model):
+    """Trigger layer for sweeping (the policy above decides HOW
+    MUCH a sweep moves; this decides WHEN one is created).
+
+    When the wallet scope's available balance for (network,
+    asset) reaches `threshold_amount`, the `run_auto_sweeps`
+    command creates a sweep through the ordinary `create_sweep`
+    path — resolver snapshot, blacklist/policy checks, approval
+    quorum and the sweep policy's threshold/leave-behind all
+    still apply downstream. At most one open auto-created sweep
+    per rule at a time.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    project = models.ForeignKey(
+        Project, on_delete=models.CASCADE, related_name="auto_sweep_rules"
+    )
+    wallet = models.ForeignKey(
+        "wallets.Wallet", on_delete=models.CASCADE, related_name="auto_sweep_rules"
+    )
+    network = models.ForeignKey(
+        "networks.BlockchainNetwork", on_delete=models.PROTECT, related_name="auto_sweep_rules"
+    )
+    asset = models.ForeignKey(
+        "assets.Asset", on_delete=models.PROTECT, related_name="auto_sweep_rules"
+    )
+    threshold_amount = models.DecimalField(max_digits=78, decimal_places=0)
+    enabled = models.BooleanField(default=True)
+    trigger_count = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="auto_sweep_rules"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "sweeps_auto_sweep_rule"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["wallet", "network", "asset"],
+                name="uniq_auto_sweep_rule_wallet_network_asset",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"AutoSweepRule(wallet={self.wallet_id}, threshold={self.threshold_amount})"
+
+
 class Sweep(models.Model):
     class Status(models.TextChoices):
         CREATED = "created"

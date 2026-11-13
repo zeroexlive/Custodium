@@ -69,6 +69,17 @@ def create_endpoint(
     return endpoint, secret
 
 
+def rotate_signing_secret(*, endpoint: WebhookEndpoint) -> str:
+    """Replace an endpoint's signing secret; returns the new
+    plaintext (shown exactly once). Deliveries attempted after
+    the rotation sign with the new secret; the old secret stops
+    working immediately — receivers must be updated in step."""
+    secret = generate_signing_secret()
+    endpoint.signing_secret_ciphertext = encrypt_secret(secret)
+    endpoint.save(update_fields=["signing_secret_ciphertext", "updated_at"])
+    return secret
+
+
 def emit_event(*, project: Project, event_type: str, data: dict) -> WebhookEvent | None:
     """Create an event + pending deliveries for subscribed,
     enabled endpoints. Returns None when nobody subscribes (the

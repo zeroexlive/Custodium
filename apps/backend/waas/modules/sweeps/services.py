@@ -30,6 +30,7 @@ from waas.security.secret_management.crypto import decrypt_secret, encrypt_secre
 
 from . import resolver
 from .models import (
+    AutoSweepRule,
     ResolvedDestinationSnapshot,
     Sweep,
     SweepApproval,
@@ -243,6 +244,62 @@ def _emit_sweep_terminal(sweep: Sweep) -> None:
             "tx_hash": sweep.chain_tx_hash,
             "status_reason": sweep.status_reason,
         },
+    )
+
+
+OPEN_SWEEP_STATUSES = [
+    Sweep.Status.CREATED,
+    Sweep.Status.RESOLVING,
+    Sweep.Status.RESOLVED,
+    Sweep.Status.AWAITING_APPROVAL,
+    Sweep.Status.SIGNING,
+    Sweep.Status.BROADCAST,
+    Sweep.Status.CONFIRMING,
+]
+
+
+def evaluate_auto_sweep_rule(rule: AutoSweepRule) -> Sweep | None:
+    """Create a sweep for `rule` when its trigger condition holds.
+
+    Trigger: the wallet scope's available balance for the rule's
+    asset reaches the rule's threshold AND no earlier auto-created
+    sweep for this rule is still open. The sweep is created
+    through the ordinary path (its amount is discovered at
+    processing time under the project's SweepPolicy), with an
+    idempotency key derived from the rule's trigger counter.
+    Returns the created Sweep, or None when not triggered.
+    """
+    if not rule.enabled:
+        return None
+    scope = rule.wallet.external_customer_id or f"wallet:{rule.wallet.id}"
+    account = ledger_services.get_or_create_account(
+        project=rule.project,
+        asset=rule.asset,
+        account_type=AccountType.CUSTOMER_AVAILABLE,
+        external_ref=scope,
+    )
+    if ledger_services.account_balance(account) < int(rule.threshold_amount):
+        return None
+    marker = f"auto-sweep:{rule.id}"
+    if Sweep.objects.filter(
+        project=rule.project,
+        wallet=rule.wallet,
+        network=rule.network,
+        asset=rule.asset,
+        external_reference=marker,
+        status__in=OPEN_SWEEP_STATUSES,
+    ).exists():
+        return None
+    rule.trigger_count += 1
+    rule.save(update_fields=["trigger_count", "updated_at"])
+    return create_sweep(
+        wallet=rule.wallet,
+        network=rule.network,
+        asset=rule.asset,
+        idempotency_key=f"auto:{rule.id}:{rule.trigger_count}",
+        external_reference=marker,
+        requested_by_type="system",
+        requested_by_id=f"auto-rule:{rule.id}",
     )
 
 

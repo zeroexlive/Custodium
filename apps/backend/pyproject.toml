@@ -17,6 +17,7 @@ dependencies = [
     "cryptography>=42",
     "gunicorn>=22",
     "pycryptodome>=4.4.0",
+    "pyotp>=2.10.0",
 ]
 
 [dependency-groups]
