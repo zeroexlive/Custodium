@@ -968,3 +968,40 @@ a separate written approval decision; neither exists.
 - NOT verified: live-chain top-ups (sandbox egress; provider-double
   proof like every family). Production signing remains disabled;
   top-ups inherit the fail-closed signer factories.
+
+### 2026-11-13 — Production-readiness pass (William: "Make this project production ready and industry standard")
+- Framing recorded honestly: everything closable from this
+  environment was closed; the external gates (independent reviews,
+  production signer build + review, pentest, legal, funded testnet
+  soaks, live drills, the approval decision) remain the owner's —
+  Custodium is still NOT Production Approved. Master gate list:
+  `docs/operations/production-readiness-checklist.md`;
+  sendable review brief: `docs/mpc/review/commissioning-brief.md`;
+  addendum appended to `docs/architecture/phase-12-hardening.md`.
+- PostgreSQL verification (was a standing NOT-verified item since
+  Phase 2): full suite on a real PostgreSQL (pgserver in-VM):
+  **179 passed, 0 skipped** — the wei-scale test runs and the
+  Phase 12 append-only triggers execute as PG triggers/functions.
+  The run caught a test bug: trigger introspection queried
+  `sqlite_master` unconditionally; now vendor-aware. (SQLite
+  suite unchanged: 178 passed / 1 skipped.)
+- Production settings: `check --deploy` clean after adding HSTS
+  preload, a 32-char minimum SECRET_KEY, and the proxy SSL header
+  for the nginx topology.
+- Audits: pip-audit — no known vulnerabilities. Secret scan of
+  the tree and full git history — clean. npm audit could NOT run
+  (the sandbox registry proxy refuses the audit endpoint) and
+  cargo audit's tool build was interrupted by a full /tmp tmpfs;
+  both recorded as environment limits in the checklist, not as
+  results. SBOMs generated into `docs/security/sbom/` (backend +
+  dashboard CycloneDX, MPC cargo metadata).
+- Code hardening: socket-level DNS pinning for the sweep resolver
+  and webhook delivery (`waas/common/http_pinning.py` — connect
+  to the validated IP, hostname preserved for Host/SNI/cert;
+  closes the Phase 10/11 rebinding note) with tests; Solana
+  priority fees (median of recent prioritization fees, capped at
+  500k micro-lamports/CU, ComputeBudget instruction; zero when
+  the cluster reports none) with tests.
+- Environment note: /tmp is a 512 MB tmpfs in this VM — large
+  build trees (cargo target/install dirs, DB data) must live
+  under $HOME or they fail with misleading "no space" errors.

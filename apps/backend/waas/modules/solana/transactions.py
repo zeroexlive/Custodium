@@ -137,6 +137,20 @@ def assemble_transaction(message_bytes: bytes, signatures: list[bytes]) -> bytes
 
 # ------------------------------------------------------------ instructions
 
+COMPUTE_BUDGET_PROGRAM = base58.decode("ComputeBudget111111111111111111111111111111")
+
+
+def set_compute_unit_price(*, micro_lamports: int) -> Instruction:
+    """ComputeBudget::SetComputeUnitPrice (instruction index 3):
+    the priority fee, in micro-lamports per compute unit."""
+    if micro_lamports <= 0:
+        raise ValueError("micro_lamports must be positive")
+    return Instruction(
+        program_id=COMPUTE_BUDGET_PROGRAM,
+        accounts=(),
+        data=bytes([3]) + struct.pack("<Q", micro_lamports),
+    )
+
 
 def system_transfer(*, from_pubkey: bytes, to_pubkey: bytes, lamports: int) -> Instruction:
     """SystemProgram::Transfer (instruction index 2)."""

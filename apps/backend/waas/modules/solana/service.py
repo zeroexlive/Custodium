@@ -34,6 +34,30 @@ from .signing import Ed25519SignerPort, SigningUnavailable
 
 SOLANA_SLUGS = ("solana", "solana-devnet")
 
+# Priority fees: the price is the median of the cluster's recent
+# prioritization fees for the fee payer, hard-capped so a fee spike
+# (or a hostile RPC answer) can never price a custody transfer
+# above this ceiling — 500k micro-lamports/CU ≈ at most ~0.03 SOL
+# for a typical token transfer's compute usage.
+PRIORITY_FEE_CAP_MICRO_LAMPORTS = 500_000
+
+
+def _priority_fee_price(provider, fee_payer_address: str) -> int:
+    """Median recent priority fee, capped; 0 when unavailable so
+    transfers keep working exactly as before on quiet clusters."""
+    getter = getattr(provider, "get_recent_prioritization_fees", None)
+    if getter is None:
+        return 0
+    try:
+        fees = getter([fee_payer_address])
+    except Exception:
+        return 0
+    if not fees:
+        return 0
+    ordered = sorted(fees)
+    median = ordered[len(ordered) // 2]
+    return max(0, min(int(median), PRIORITY_FEE_CAP_MICRO_LAMPORTS))
+
 
 class SolanaServiceError(Exception):
     """A withdrawal was refused before any funds moved."""
@@ -165,6 +189,12 @@ def execute_withdrawal(
                 sol_tx.system_transfer(
                     from_pubkey=owner, to_pubkey=destination, lamports=amount
                 )
+            ]
+        priority_price = _priority_fee_price(provider, owner_address)
+        if priority_price > 0:
+            instructions = [
+                sol_tx.set_compute_unit_price(micro_lamports=priority_price),
+                *instructions,
             ]
         compiled = sol_tx.compile_message(
             fee_payer=owner, instructions=instructions, recent_blockhash=blockhash_bytes

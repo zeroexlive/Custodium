@@ -337,3 +337,52 @@ def test_solana_reorg_reverses_deposit(ctx) -> None:
     assert balance(ctx, ctx["sol"], AccountType.CUSTOMER_AVAILABLE) == 0
     assert ledger_services.trial_balance(ctx["project"], ctx["sol"]) == 0
 
+
+
+# ---------------------------------------------------------- priority fees
+
+
+class FeeProvider(FakeSolanaProvider):
+    """Provider double that reports recent prioritization fees."""
+
+    def __init__(self, network, fees):
+        super().__init__(network)
+        self._fees = fees
+
+    def get_recent_prioritization_fees(self, addresses):
+        return list(self._fees)
+
+
+def test_priority_fee_instruction_prepended_at_median(ctx) -> None:
+    import struct
+
+    from waas.modules.solana import transactions as sol_tx
+
+    credit(ctx, ctx["sol"], 1_000_000_000)
+    provider = FeeProvider(ctx["solana"], [10_000, 30_000, 20_000])
+    tx = withdraw(ctx, provider, idempotency_key="wd-prio-1")
+    assert tx.status == "broadcast"
+    message = bytes.fromhex(tx.message_bytes)
+    # The ComputeBudget program is an account key in the message and
+    # the SetComputeUnitPrice data (tag 3 + u64 LE median 20_000)
+    # is present; with no fees reported, neither appears.
+    assert sol_tx.COMPUTE_BUDGET_PROGRAM in message
+    assert bytes([3]) + struct.pack("<Q", 20_000) in message
+
+    provider2 = FeeProvider(ctx["solana"], [])
+    tx2 = withdraw(ctx, provider2, idempotency_key="wd-prio-2")
+    assert tx2.status == "broadcast"
+    assert sol_tx.COMPUTE_BUDGET_PROGRAM not in bytes.fromhex(tx2.message_bytes)
+
+
+def test_priority_fee_is_capped(ctx) -> None:
+    import struct
+
+    from waas.modules.solana import service as sol_service
+
+    credit(ctx, ctx["sol"], 1_000_000_000)
+    provider = FeeProvider(ctx["solana"], [10**9, 10**9])
+    tx = withdraw(ctx, provider, idempotency_key="wd-prio-3")
+    message = bytes.fromhex(tx.message_bytes)
+    cap = sol_service.PRIORITY_FEE_CAP_MICRO_LAMPORTS
+    assert bytes([3]) + struct.pack("<Q", cap) in message

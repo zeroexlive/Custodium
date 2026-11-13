@@ -31,6 +31,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from waas.common.http_pinning import pinned_httpx_client
+
 RESOLVER_VERSION = 1
 MAX_BODY_BYTES = 512
 CONNECT_TIMEOUT = 3.0
@@ -68,9 +70,14 @@ def default_dns_resolver(hostname: str) -> list[str]:
     return sorted({info[4][0] for info in infos})
 
 
-def validate_endpoint_url(url: str, *, dns_resolver=default_dns_resolver) -> str:
-    """Registration- and call-time URL validation (§6). Returns
-    the URL unchanged or raises ResolutionError('ssrf'|'format')."""
+def validated_host_ips(
+    url: str, *, dns_resolver=default_dns_resolver
+) -> tuple[str, list[str]]:
+    """Validate an endpoint URL (§6) and return ``(host, ips)`` —
+    every DNS answer must be a public IP. Callers that go on to
+    connect MUST pin the socket to one of the returned IPs (see
+    waas.common.http_pinning) so the validated answer is the one
+    actually used (DNS-rebinding/TOCTOU defence)."""
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise ResolutionError("ssrf", "endpoint URL must use https")
@@ -97,6 +104,13 @@ def validate_endpoint_url(url: str, *, dns_resolver=default_dns_resolver) -> str
         raise ResolutionError(
             "ssrf", f"endpoint host resolves to non-public address(es): {bad}"
         )
+    return host, candidates
+
+
+def validate_endpoint_url(url: str, *, dns_resolver=default_dns_resolver) -> str:
+    """Registration- and call-time URL validation (§6). Returns
+    the URL unchanged or raises ResolutionError('ssrf'|'format')."""
+    validated_host_ips(url, dns_resolver=dns_resolver)
     return url
 
 
@@ -142,7 +156,7 @@ def resolve_destination(
     dns_resolver=default_dns_resolver,
 ) -> ResolvedDestination:
     """One fresh resolution (§5). Never cached, never reused."""
-    validate_endpoint_url(endpoint_url, dns_resolver=dns_resolver)
+    host, ips = validated_host_ips(endpoint_url, dns_resolver=dns_resolver)
     timestamp = str(int(time.time()))
     headers = {
         "X-Blockchain-Network": network.slug,
@@ -156,10 +170,12 @@ def resolve_destination(
         headers["X-WaaS-Signature"] = hmac.new(
             signing_secret.encode(), canonical.encode(), hashlib.sha256
         ).hexdigest()
-    client = http_client or httpx.Client(
+    # Pin the socket to the first validated IP: the answer the
+    # validator approved is the address actually connected to.
+    client = http_client or pinned_httpx_client(
+        host=host,
+        ip=ips[0],
         timeout=httpx.Timeout(TOTAL_TIMEOUT, connect=CONNECT_TIMEOUT),
-        follow_redirects=False,
-        trust_env=False,
     )
     last_error: Exception | None = None
     for _attempt in range(MAX_ATTEMPTS):

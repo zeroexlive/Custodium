@@ -90,6 +90,18 @@ class SolanaProvider:
         )
         return result if isinstance(result, dict) else None
 
+    def get_recent_prioritization_fees(self, addresses: list[str]) -> list[int]:
+        """Recent per-slot priority fees (micro-lamports per
+        compute unit) for the given writable accounts."""
+        result = self._call("getRecentPrioritizationFees", [addresses])
+        if not isinstance(result, list):
+            return []
+        return [
+            int(entry["prioritizationFee"])
+            for entry in result
+            if isinstance(entry, dict) and "prioritizationFee" in entry
+        ]
+
     def get_transaction_fee(self, signature: str) -> int | None:
         """The network fee (lamports) of a landed transaction."""
         result = self._call(

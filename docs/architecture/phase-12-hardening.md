@@ -78,3 +78,28 @@ scratch database and confirm rejection).
   Phase 0 design against local doubles; the gap to production
   is evidence (reviews, live-chain soaks, drills), not
   features.
+
+## Addendum — 2026-11-13 production-readiness pass
+
+Verified and closed since the assessment above (evidence in
+`docs/operations/production-readiness-checklist.md`):
+
+- The full backend suite now runs green on a **real PostgreSQL**
+  (179 passed, 0 skipped), including the wei-scale ledger test
+  and the append-only triggers executing as PostgreSQL
+  triggers/functions — §3's deployment-time smoke test is done.
+  The run exposed one test-side bug (SQLite-only trigger
+  introspection), fixed vendor-aware.
+- `manage.py check --deploy` on production settings reports no
+  issues.
+- `pip-audit` clean; secret scan of tree + git history clean;
+  SBOMs produced for all three components.
+- DNS pinning closes the resolver/webhook rebinding (TOCTOU) gap
+  previously assigned to the deployment layer; Solana transfers
+  now carry capped, median-priced priority fees.
+
+Unchanged and still open: the independent reviews, the production
+signer implementation + its review, pentest, legal review, funded
+testnet soaks, live deployment/DR/key-ceremony drills, and the
+production approval decision itself. **Custodium remains NOT
+Production Approved.**
