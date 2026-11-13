@@ -95,3 +95,16 @@ decision.
   when the owning operation is retried; a top-up for an operation
   that is never retried stays `broadcast` in the list view (its
   chain transaction still settles through the same row).
+
+**Automatic setup (2026-11-14).** Creating a project now creates
+its gas station automatically: a dedicated funding wallet
+(external customer id `gas-station`, label "Gas Station") plus
+one station per seeded network with per-family defaults
+(EVM 0.0005/0.002, TRON 10/50, Solana 0.01/0.05, TON 0.05/0.2
+native units, threshold/top-up; daily cap 100). The setup is
+idempotent (`gasstation.services.setup_project_gas_station`),
+audited as `gas_station.auto_configured`, and the funding wallet
+is a normal project wallet — it counts in wallet lists and plan
+metering. Its per-network top-up addresses exist as soon as the
+wallet is provisioned, under the same MPC gate as every wallet;
+before that, station rows report `top_up_address: null`.

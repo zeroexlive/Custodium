@@ -1418,3 +1418,51 @@ a separate written approval decision; neither exists.
 - NOT verified: browser-driven rendering against a live backend
   (not available in this environment). Status unchanged: NOT
   Production Approved.
+
+### 2026-11-14 — Workflow gaps II: automatic gas-station setup + create-address API (William's re-specified workflow)
+
+- William re-specified the workflow (auto gas-sponsor addresses
+  at project creation; address creation via API). Verification
+  found the deposit/withdrawal mechanics already in place; these
+  two gaps were built:
+- (1) Auto gas setup: creating a project (POST /projects, one
+  transaction) now also creates a dedicated funding wallet
+  (external_customer_id "gas-station", label "Gas Station") and
+  one GasStation per seeded network with per-family defaults —
+  gasstation.services.setup_project_gas_station (idempotent,
+  audited gas_station.auto_configured): EVM min 5e14/topup 2e15,
+  TRON 1e7/5e7 SUN, Solana 1e7/5e7 lamports, TON 5e7/2e8
+  nanotons, daily cap 100. The wallet is a normal project wallet
+  (appears in wallet lists, counts in plan metering; provisioning
+  it follows the ordinary signer-gated flow, after which station
+  top_up_address values resolve).
+- (2) Create-address API: POST /wallets/{id}/addresses {network}
+  replaces the Phase 2-era 501 stub. Returns the existing address
+  (200) or derives + records it (201) from the wallet's group
+  public key — provisioning now PERSISTS both group public keys
+  on the wallet (wallets migration 0002; public material only,
+  shares never leave the signer) and
+  provisioning.derive_address_for_network does the per-family
+  derivation with no signer call. Unprovisioned wallet -> 409,
+  unknown network -> 422, machine callers need
+  addresses:write/wallets:write/write scope, dashboard callers a
+  write role. Audited wallet.address_created. Dashboard:
+  Addresses view's stale 501 card replaced with a working
+  create/get control + client function.
+- Phase 2 tests updated where the specified behaviour changed
+  them: wallet list totals and global wallet counts now account
+  for the auto gas-station wallet (assertions scoped to exclude
+  it where the customer wallet was the subject), and the address
+  gate assertion is 409 (unprovisioned) instead of 501.
+- Tests: tests/integration/test_workflow_gaps2.py (7): station
+  auto-creation incl. family defaults + API visibility with null
+  top_up_address pre-provisioning + idempotent re-setup; address
+  API 409/derive-201/return-200 (generator-point EVM + pinned
+  Solana vectors)/422/403-scope; provisioning persists both
+  public keys (monkeypatched key meta). Full suite 224 passed /
+  1 skipped, ruff clean; frontend build + vitest 21 passed.
+- NOT verified: live provisioning of an auto-created funding
+  wallet against real signer nodes in this pass (the Phase 21
+  rehearsal proved the same flow for a regular wallet; the
+  funding wallet differs only in label/external id). Status
+  unchanged: NOT Production Approved.

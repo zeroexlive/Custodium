@@ -50,6 +50,8 @@ WaaS products are compared on). Status meanings:
 | **Static hot-wallet destinations (manual mode, per project + network)** | **Added 2026-11-13** | `SweepPolicy.destination_mode=static`, `/sweep-destinations`, `/sweep-policy`; ADR 0006 amended by the owner — request-side prohibitions unchanged |
 | **Deposit minimum per project + asset (held deposits accumulate until they reach it; no maximum by design)** | **Added 2026-11-13** | indexing `DepositPolicy`, `/deposit-policies`; enforced in the shared confirmation pass |
 | **Withdrawal minimum (`min_single_amount`, beside the existing max/daily limits)** | **Added 2026-11-13** | operations policy API + creation enforcement |
+| **Automatic gas-station setup at project creation (funding wallet + one station per network)** | **Added 2026-11-14** | `setup_project_gas_station` on POST /projects; per-family defaults; addresses appear at wallet provisioning |
+| **Create-address API: POST /wallets/{id}/addresses returns or derives the address for a network** | **Added 2026-11-14** | Derives from the wallet's stored group public key (persisted at provisioning; public material only); 409 when unprovisioned; machine scopes addresses:write/wallets:write |
 | **Gas-station top-up address surfaced in the API** | **Added 2026-11-13** | `GET /gas-stations` returns `top_up_address` (the funding wallet's address on that network) |
 | **Auto-sweep rules (balance-threshold triggers)** | **Added 2026-11-13** | `/auto-sweep-rules`, `run_auto_sweeps` command; sweeps still flow through resolver + policy + approvals |
 | Gas station (native-balance top-ups that defer, never fail) | Available | gasstation |

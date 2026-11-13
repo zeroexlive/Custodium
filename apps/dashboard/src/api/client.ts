@@ -113,8 +113,11 @@ export const api = {
   setWalletStatus: (id: string, status: 'active' | 'frozen' | 'archived') =>
     request<Wallet>('PATCH', `/wallets/${encodeURIComponent(id)}/status`, { status }),
 
-  // Addresses — listing only. Derivation arrives with MPC Phase 3/4 and the
-  // POST endpoint returns 501 until then; there is deliberately no create call.
+  // Addresses — listing, plus create: returns the existing address or
+  // derives + records it from the wallet's group public key (409 when
+  // the wallet is not provisioned yet; nothing is fabricated).
+  createWalletAddress: (walletId: string, network: string) =>
+    request<WalletAddress>('POST', `/wallets/${encodeURIComponent(walletId)}/addresses`, { network }),
   listWalletAddresses: async (walletId: string, network?: string): Promise<WalletAddress[]> => {
     const query = network ? `?network=${encodeURIComponent(network)}` : ''
     return listOf(await request<WalletAddress[] | { items: WalletAddress[] }>('GET', `/wallets/${encodeURIComponent(walletId)}/addresses${query}`))
