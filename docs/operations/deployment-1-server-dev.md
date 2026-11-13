@@ -127,9 +127,42 @@ of the platform works offline.
 ```bash
 curl localhost:8000/healthz     # {"status":"ok"}
 curl localhost:8000/readyz      # {"status":"ready"}
-cd apps/backend && uv run pytest          # 167 passed, 1 skipped
+cd apps/backend && uv run pytest          # 178 passed, 1 skipped
 cd apps/dashboard && npx vitest run       # 9 passed
 ```
+
+## Troubleshooting
+
+**The dashboard loads, but register/login (any API action) shows
+error 500.** The page loading only proves the *dashboard*
+container is up — API calls go through its proxy to the backend,
+and a dead backend surfaces as a proxy 500. Work from the API
+outward:
+
+```bash
+docker compose ps                    # is backend "up (healthy)"?
+docker compose logs --tail=80 backend
+curl -X POST localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"a@b.co","password":"<redacted>","display_name":"A"}'
+```
+
+- The `curl` returns **201** → the backend is fine; the problem
+  is the dashboard→backend path (check `docker compose logs
+  dashboard` and that the stack was built from a current checkout).
+- The `curl` also fails, or `backend` is `Restarting`/`Exited` →
+  the last lines of the backend log hold the cause. The most
+  common one: **database credentials mismatch.** Compose applies
+  `POSTGRES_PASSWORD` only when the postgres volume is *first*
+  created; changing it later in `.env` does not change the
+  password inside the existing volume, so the backend cannot
+  connect and dies in `migrate`. Fix by restoring the original
+  password in `.env`, or — if no data matters yet — reset:
+  `docker compose down -v && docker compose up --build`
+  (the `-v` deletes the database volume).
+- `curl localhost:8000/readyz` returning 503 means the API
+  process is up but cannot reach PostgreSQL — same credential /
+  volume family of causes.
 
 ## Limitations of one server (read before graduating)
 

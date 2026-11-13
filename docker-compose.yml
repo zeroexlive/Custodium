@@ -54,6 +54,15 @@ services:
       sh -c "python manage.py migrate &&
              python manage.py seed_networks_assets &&
              python manage.py runserver 0.0.0.0:8000"
+    # Healthy only once the API actually answers — until then the
+    # dashboard (which waits for this) would proxy to a dead or
+    # still-migrating backend and surface opaque 500s.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 20s
 
   dashboard:
     build:
@@ -62,7 +71,8 @@ services:
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     # Vite dev server proxies /api -> backend:8000 (see vite.config.ts,
     # VITE_API_PROXY_TARGET inside the dashboard Dockerfile).
 

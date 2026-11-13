@@ -1005,3 +1005,39 @@ a separate written approval decision; neither exists.
 - Environment note: /tmp is a 512 MB tmpfs in this VM — large
   build trees (cargo target/install dirs, DB data) must live
   under $HOME or they fail with misleading "no space" errors.
+
+### 2026-11-13 — Register-500 investigation (William's live Compose run) + deployment hardening
+
+- William ran the one-server Compose stack on his own server:
+  the dashboard loaded, but registration returned **500** — the
+  first live deployment report for the project.
+- Reproduced every layer available in this VM: backend under
+  development settings via a real `runserver` process → register
+  **201** (SQLite); through the Vite dev proxy exactly as the
+  browser calls it → **201**; against a real PostgreSQL with a
+  NON-superuser `custodium` role and migrations run as that role
+  (Compose-matching) → **201**. Login → create organization also
+  verified over HTTP (201). Conclusion: no registration code path
+  reproduces a 500 in any configuration reproducible here; the
+  failure on William's server is environmental and the
+  discriminating evidence (`docker compose ps`, backend logs)
+  lives on his server. Most probable cause family: backend
+  container down or crash-looping (e.g. POSTGRES_PASSWORD changed
+  after the postgres volume was initialized, so `migrate` cannot
+  connect) while the dashboard container serves pages and its
+  proxy surfaces the dead backend as a 500.
+- Hardening shipped so this failure mode is visible instead of
+  opaque: backend **healthcheck** on `/healthz` in
+  `docker-compose.yml`, dashboard now depends on backend
+  `service_healthy`; new **Troubleshooting** section in
+  `docs/operations/deployment-1-server-dev.md` (register-500
+  decision tree, the password/volume trap, `readyz` semantics;
+  stale verify-install test count corrected to 178 passed /
+  1 skipped).
+- Verified: compose YAML parses; the healthcheck probe command
+  exercised against a live dev server (200); register/login/org
+  flows over HTTP as above. NOT verified: Docker itself (no
+  Docker in this VM) — the Compose change is configuration-level,
+  validated by inspection + YAML parse only. William's
+  server-side root cause remains OPEN pending his
+  `docker compose logs backend` output.
