@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { api } from '@/api/client'
 import Card from '@/components/ui/Card.vue'
+import Button from '@/components/ui/Button.vue'
 import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
@@ -24,18 +25,43 @@ const addresses = useQuery({
 })
 
 watch(projectId, () => { walletId.value = '' })
+
+const queryClient = useQueryClient()
+const createNetwork = ref('ethereum')
+const createdAddress = ref('')
+const createError = ref('')
+const create = useMutation({
+  mutationFn: () => api.createWalletAddress(walletId.value, createNetwork.value),
+  onSuccess: (data) => {
+    createdAddress.value = data.address
+    createError.value = ''
+    void queryClient.invalidateQueries({ queryKey: ['wallet-addresses', walletId.value] })
+  },
+  onError: (e) => { createError.value = e instanceof Error ? e.message : 'Request failed' },
+})
 </script>
 <template>
   <div class="space-y-6">
     <h1 class="text-2xl font-semibold">Addresses</h1>
 
-    <Card title="Address generation — arrives with the MPC phase">
+    <Card title="Create or get an address">
       <p class="text-sm text-ink-muted">
-        Deriving a deposit address requires MPC threshold key generation (Phase 3) and per-chain
-        integration (Phase 4 onwards). Until then the API deliberately answers address creation with
-        <span class="font-mono">501 Not Implemented</span> and no address is fabricated. Addresses that
-        already exist for a wallet are listed below, read-only.
+        Returns the wallet's address for a network — deriving and recording it from the
+        wallet's group public key when it does not exist yet. A wallet that has not been
+        provisioned has no key and honestly returns an error instead of a fabricated address.
+        Select a project and wallet below first.
       </p>
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="text-sm">
+          <span class="mb-1 block text-ink-muted">Network</span>
+          <select v-model="createNetwork" class="rounded-lg border border-line bg-white px-3 py-2">
+            <option v-for="n in networks.data.value ?? []" :key="n.slug" :value="n.slug">{{ n.slug }}</option>
+          </select>
+        </label>
+        <Button :disabled="!walletId || create.isPending.value" @click="create.mutate()">Create / get address</Button>
+        <p v-if="createdAddress" class="font-mono text-sm break-all">{{ createdAddress }}</p>
+      </div>
+      <p v-if="createError" role="alert" class="mt-2 text-sm text-danger">{{ createError }}</p>
     </Card>
 
     <Card title="Select wallet">

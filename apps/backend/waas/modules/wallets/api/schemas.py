@@ -14,6 +14,10 @@ class WalletStatusIn(Schema):
     status: str  # frozen | active | archived
 
 
+class AddressCreateIn(Schema):
+    network: str  # network slug
+
+
 class ResolveIn(Schema):
     project_id: str | None = None
     external_customer_id: str

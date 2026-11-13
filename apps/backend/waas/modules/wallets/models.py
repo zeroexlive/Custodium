@@ -39,6 +39,12 @@ class Wallet(models.Model):
     # Opaque MPC coordinator references — never key material.
     ecdsa_key_ref = models.CharField(max_length=128, null=True, blank=True)
     ed25519_key_ref = models.CharField(max_length=128, null=True, blank=True)
+    # Group PUBLIC keys (hex), recorded at provisioning. Public keys
+    # are not secret: they let the backend derive this wallet's
+    # address for a network on demand (POST /wallets/{id}/addresses)
+    # without a live signer call. Shares never leave the signer.
+    ecdsa_public_key = models.CharField(max_length=200, blank=True, default="")
+    ed25519_public_key = models.CharField(max_length=200, blank=True, default="")
     policy_name = models.CharField(max_length=100, blank=True, default="")
     policy_version = models.CharField(max_length=32, blank=True, default="")
     idempotency_key = models.CharField(max_length=200, null=True, blank=True)

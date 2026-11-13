@@ -137,6 +137,8 @@ def provision_wallet(
         ecdsa_public_key=bytes.fromhex(ecdsa_meta["public_key"]),
         ed25519_public_key=bytes.fromhex(ed25519_meta["public_key"]),
     )
+    ecdsa_public_hex = str(ecdsa_meta["public_key"]).lower()
+    ed25519_public_hex = str(ed25519_meta["public_key"]).lower()
     with transaction.atomic():
         for network in BlockchainNetwork.objects.all().order_by("slug"):
             family = family_for_slug(network.slug)
@@ -149,9 +151,15 @@ def provision_wallet(
             )
         wallet.ecdsa_key_ref = ecdsa_key_id
         wallet.ed25519_key_ref = ed25519_key_id
+        wallet.ecdsa_public_key = ecdsa_public_hex
+        wallet.ed25519_public_key = ed25519_public_hex
         wallet.status = Wallet.Status.ACTIVE
         wallet.save(
-            update_fields=["ecdsa_key_ref", "ed25519_key_ref", "status", "updated_at"]
+            update_fields=[
+                "ecdsa_key_ref", "ed25519_key_ref",
+                "ecdsa_public_key", "ed25519_public_key",
+                "status", "updated_at",
+            ]
         )
         AuditEvent.record(
             "wallet.provisioned",
@@ -167,3 +175,31 @@ def provision_wallet(
             },
         )
     return wallet
+
+
+def derive_address_for_network(wallet: Wallet, network) -> str:
+    """Derive `wallet`'s address for one network from its stored
+    group public keys — no signer call. Raises
+    `ProvisioningUnavailable` when the wallet has not been
+    provisioned (no public key recorded for the network's family).
+    """
+    family = family_for_slug(network.slug)
+    if family in ("evm", "tron"):
+        if not wallet.ecdsa_public_key:
+            raise ProvisioningUnavailable(
+                "wallet is not provisioned: no ECDSA group public key "
+                "is recorded; provision the wallet before creating addresses"
+            )
+        public_key = bytes.fromhex(wallet.ecdsa_public_key)
+        if family == "evm":
+            return evm_address_from_public_key(public_key)
+        return tron_address_from_public_key(public_key)
+    if not wallet.ed25519_public_key:
+        raise ProvisioningUnavailable(
+            "wallet is not provisioned: no Ed25519 group public key "
+            "is recorded; provision the wallet before creating addresses"
+        )
+    public_key = bytes.fromhex(wallet.ed25519_public_key)
+    if family == "solana":
+        return solana_address_from_public_key(public_key)
+    return wallet_address_raw(public_key=public_key)

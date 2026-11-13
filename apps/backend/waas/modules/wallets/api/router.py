@@ -10,7 +10,14 @@ from waas.modules.audit.models import AuditEvent
 from waas.modules.networks.models import BlockchainNetwork
 from waas.modules.organizations.api.router import WRITE_ROLES
 from waas.modules.organizations.models import Membership
-from waas.modules.wallets.api.schemas import ResolveIn, WalletIn, WalletStatusIn, address_out, wallet_out
+from waas.modules.wallets.api.schemas import (
+    AddressCreateIn,
+    ResolveIn,
+    WalletIn,
+    WalletStatusIn,
+    address_out,
+    wallet_out,
+)
 from waas.modules.wallets.models import Address, Wallet
 
 router = Router(tags=["wallets"])
@@ -171,15 +178,64 @@ def list_addresses(request, wallet_id: str, network: str | None = None):
     return paginated(address_out(a) for a in addresses)
 
 
-@router.post("/wallets/{wallet_id}/addresses", auth=any_auth)
-def create_address_not_implemented(request, wallet_id: str):
-    # Tenant check first so the gate does not leak wallet existence.
-    _scoped_wallet(request, wallet_id)
-    raise HttpError(
-        501,
-        "Address derivation requires MPC key generation (Phase 3) and chain "
-        "integration (Phase 4+). No address is fabricated in the meantime.",
+@router.post(
+    "/wallets/{wallet_id}/addresses",
+    response={201: dict, 200: dict, 403: dict, 404: dict, 409: dict, 422: dict},
+    auth=any_auth,
+)
+def create_address(request, wallet_id: str, payload: AddressCreateIn):
+    """Create (or return) the wallet's address for one network.
+
+    The address comes from the wallet's recorded group public key —
+    the same derivation provisioning used — so this works without a
+    live signer call once the wallet is provisioned. An
+    unprovisioned wallet gets an honest 409: no address is ever
+    fabricated for a key that does not exist.
+    """
+    if is_machine(request) and not has_any_scope(request, "addresses:write", "wallets:write", "write"):
+        raise HttpError(403, "Missing required scope: addresses:write")
+    wallet = _scoped_wallet(request, wallet_id)
+    if not is_machine(request):
+        resolve_project(request, str(wallet.project_id), write=True)
+    network = BlockchainNetwork.objects.filter(slug=payload.network.strip()).first()
+    if network is None:
+        raise HttpError(422, f"unknown network: {payload.network}")
+    existing = Address.objects.filter(wallet=wallet, network=network).first()
+    if existing is not None:
+        return Status(200, address_out(existing))
+    from waas.modules.wallets.provisioning import (
+        ProvisioningUnavailable,
+        derive_address_for_network,
     )
+    from waas.modules.wallets.services import record_derived_address
+
+    try:
+        address = derive_address_for_network(wallet, network)
+    except ProvisioningUnavailable as exc:
+        raise HttpError(409, str(exc)) from exc
+    key_ref = (
+        wallet.ecdsa_key_ref
+        if network.slug.startswith(("ethereum", "bsc", "tron"))
+        else wallet.ed25519_key_ref
+    )
+    record = record_derived_address(
+        wallet=wallet,
+        network=network,
+        address=address,
+        derivation_path=f"signer-service:{key_ref}",
+    )
+    AuditEvent.record(
+        "wallet.address_created",
+        actor_user=None if is_machine(request) else request.auth,
+        organization=wallet.project.organization,
+        project=wallet.project,
+        metadata={
+            "wallet_id": str(wallet.id),
+            "network": network.slug,
+            "via": "api_key" if is_machine(request) else "dashboard",
+        },
+    )
+    return Status(201, address_out(record))
 
 
 @router.post("/addresses/resolve", response=dict, auth=any_auth)

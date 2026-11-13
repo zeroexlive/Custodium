@@ -47,7 +47,10 @@ def test_dashboard_wallet_lifecycle(client: Client, seeded) -> None:
 
     listing = client.get(f"/api/v1/wallets?project_id={project_id}", **auth_headers(token))
     assert listing.status_code == 200
-    assert listing.json()["total"] == 1
+    # The project also holds its auto-created gas-station wallet
+    # (William's workflow, 2026-11-14), hence total == 2.
+    assert listing.json()["total"] == 2
+    assert any(item["id"] == wallet["id"] for item in listing.json()["items"])
 
     # A provisioning wallet cannot be force-activated through the API.
     resp = client.patch(
@@ -78,7 +81,8 @@ def test_wallet_create_idempotency_key_replay(client: Client, seeded) -> None:
     assert first.status_code == 201
     assert second.status_code == 200
     assert first.json()["id"] == second.json()["id"]
-    assert Wallet.objects.count() == 1
+    # Excluding the project's auto-created gas-station wallet.
+    assert Wallet.objects.exclude(external_customer_id="gas-station").count() == 1
 
 
 def test_machine_wallet_create_and_scope_enforcement(client: Client, seeded) -> None:
@@ -131,7 +135,7 @@ def test_address_creation_gated_and_recorded_addresses_visible(client: Client, s
         content_type="application/json",
         **auth_headers(token),
     )
-    assert resp.status_code == 501  # derivation needs Phase 3/4; nothing fabricated
+    assert resp.status_code == 409  # wallet not provisioned; nothing fabricated
 
     network = BlockchainNetwork.objects.get(slug="ethereum")
     record_derived_address(

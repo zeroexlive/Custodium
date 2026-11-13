@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from ninja import Router, Status
 from ninja.errors import HttpError
 
@@ -29,10 +29,17 @@ def create_project(request, payload: ProjectIn):
     if not name:
         raise HttpError(422, "Project name is required")
     try:
-        project = Project.objects.create(
-            organization=membership.organization, name=name,
-            environment=payload.environment, created_by=request.auth,
-        )
+        with transaction.atomic():
+            project = Project.objects.create(
+                organization=membership.organization, name=name,
+                environment=payload.environment, created_by=request.auth,
+            )
+            # William's workflow (2026-11-14): a new project comes with
+            # its gas station ready — a dedicated funding wallet plus
+            # one station per seeded network to fund for sweep fees.
+            from waas.modules.gasstation.services import setup_project_gas_station
+
+            setup_project_gas_station(project, actor_user=request.auth)
     except IntegrityError as exc:
         raise HttpError(409, "A project with that name already exists in this environment") from exc
     AuditEvent.record(

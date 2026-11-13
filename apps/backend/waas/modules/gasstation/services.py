@@ -183,3 +183,66 @@ def preflight_transfer(
         },
     )
     raise GasTopUpPending("gas top-up broadcast; awaiting confirmation")
+
+
+# ---------------------------------------------------------------------------
+# Automatic setup at project creation (William's workflow, 2026-11-14):
+# every new project gets a dedicated funding wallet (external id
+# "gas-station") and one station per seeded network, so the client
+# immediately has a per-network top-up address to fund once the
+# wallet is provisioned. Defaults are per family (native decimals
+# differ wildly); clients tune them per network afterwards.
+# ---------------------------------------------------------------------------
+
+GAS_STATION_EXTERNAL_ID = "gas-station"
+
+_FAMILY_DEFAULTS: dict[str, tuple[int, int]] = {
+    # family: (min_native_balance, topup_amount) in native base units
+    "evm": (500_000_000_000_000, 2_000_000_000_000_000),  # 0.0005 / 0.002
+    "tron": (10_000_000, 50_000_000),  # 10 / 50 TRX
+    "solana": (10_000_000, 50_000_000),  # 0.01 / 0.05 SOL
+    "ton": (50_000_000, 200_000_000),  # 0.05 / 0.2 TON
+}
+
+
+def setup_project_gas_station(project, *, actor_user=None):
+    """Idempotently create the project's gas-station funding wallet
+    and one station per seeded network. Returns (wallet, created_count).
+    """
+    from waas.common.address_normalization import family_for_slug
+    from waas.modules.networks.models import BlockchainNetwork
+    from waas.modules.wallets.models import Wallet
+
+    wallet, _ = Wallet.objects.get_or_create(
+        project=project,
+        external_customer_id=GAS_STATION_EXTERNAL_ID,
+        defaults={"label": "Gas Station"},
+    )
+    created = 0
+    for network in BlockchainNetwork.objects.all().order_by("slug"):
+        minimum, topup = _FAMILY_DEFAULTS.get(
+            family_for_slug(network.slug), _FAMILY_DEFAULTS["evm"]
+        )
+        _, was_created = GasStation.objects.get_or_create(
+            project=project,
+            network=network,
+            defaults={
+                "funding_wallet": wallet,
+                "min_native_balance": minimum,
+                "topup_amount": topup,
+                "max_topups_per_day": 100,
+                "enabled": True,
+            },
+        )
+        created += int(was_created)
+    AuditEvent.record(
+        "gas_station.auto_configured",
+        actor_user=actor_user,
+        organization=project.organization,
+        project=project,
+        metadata={
+            "funding_wallet_id": str(wallet.id),
+            "stations_created": created,
+        },
+    )
+    return wallet, created
