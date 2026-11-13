@@ -20,6 +20,7 @@ const groups: NavGroup[] = [
       { to: '/organizations', label: 'Organizations' },
       { to: '/projects', label: 'Projects' },
       { to: '/api-keys', label: 'API Keys' },
+      { to: '/security', label: 'Security' },
     ],
   },
   {
@@ -31,6 +32,9 @@ const groups: NavGroup[] = [
       { to: '/assets', label: 'Assets & Networks' },
       { to: '/sweeps', label: 'Sweeps' },
       { to: '/sweep-endpoint', label: 'Sweep Endpoint' },
+      { to: '/sweep-settings', label: 'Sweep Settings' },
+      { to: '/address-book', label: 'Address Book' },
+      { to: '/deposit-policies', label: 'Deposit Policies' },
       { to: '/gas-station', label: 'Gas Station' },
     ],
   },

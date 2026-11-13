@@ -6,23 +6,48 @@ import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
 import Card from '@/components/ui/Card.vue'
 
-const email = ref(''); const password = ref(''); const error = ref<string | null>(null)
+const email = ref(''); const password = ref(''); const code = ref('')
+const error = ref<string | null>(null)
+const step = ref<'credentials' | 'totp'>('credentials')
 const auth = useAuthStore(); const router = useRouter()
+
 async function submit(): Promise<void> {
   error.value = null
-  try { await auth.login(email.value, password.value); await router.push('/') }
-  catch (e) { error.value = e instanceof Error ? e.message : 'Login failed' }
+  try {
+    const outcome = await auth.login(email.value, password.value)
+    if (outcome === 'totp') { step.value = 'totp'; return }
+    await router.push('/')
+  } catch (e) { error.value = e instanceof Error ? e.message : 'Login failed' }
+}
+
+async function submitCode(): Promise<void> {
+  error.value = null
+  try { await auth.completeTotp(code.value.trim()); await router.push('/') }
+  catch (e) { error.value = e instanceof Error ? e.message : 'Two-factor verification failed' }
 }
 </script>
 <template>
   <main class="min-h-screen flex items-center justify-center p-4">
     <Card title="Log in to Custodium" class="w-full max-w-md">
-      <form class="space-y-4" @submit.prevent="submit">
+      <form v-if="step === 'credentials'" class="space-y-4" @submit.prevent="submit">
         <Input id="email" v-model="email" label="Email" type="email" required autocomplete="email" />
         <Input id="password" v-model="password" label="Password" type="password" required autocomplete="current-password" />
         <p v-if="error" role="alert" class="text-sm text-danger">{{ error }}</p>
         <Button type="submit" :disabled="auth.loading">Log in</Button>
         <p class="text-sm">No account? <RouterLink to="/register" class="underline">Register</RouterLink></p>
+      </form>
+      <form v-else class="space-y-4" @submit.prevent="submitCode">
+        <p class="text-sm text-ink-muted">
+          This account has two-factor authentication enabled. Enter the
+          6-digit code from your authenticator app, or one of your
+          recovery codes.
+        </p>
+        <Input id="totp-code" v-model="code" label="Two-factor code" required autocomplete="one-time-code" />
+        <p v-if="error" role="alert" class="text-sm text-danger">{{ error }}</p>
+        <Button type="submit" :disabled="auth.loading">Verify and log in</Button>
+        <p class="text-sm">
+          <button type="button" class="underline" @click="step = 'credentials'">Back to sign in</button>
+        </p>
       </form>
     </Card>
   </main>

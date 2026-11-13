@@ -36,6 +36,11 @@ const create = useMutation({
   },
   onError: (e) => { formError.value = e instanceof Error ? e.message : 'Request failed' },
 })
+const rotate = useMutation({
+  mutationFn: (id: string) => api.rotateWebhookSecret(id),
+  onSuccess: (data) => { newSecret.value = data.signing_secret },
+  onError: (e) => { formError.value = e instanceof Error ? e.message : 'Rotation failed' },
+})
 const disable = useMutation({
   mutationFn: (id: string) => api.disableWebhookEndpoint(id),
   onSuccess: () => void client.invalidateQueries({ queryKey: ['webhook-endpoints', projectId.value] }),
@@ -115,7 +120,10 @@ function tone(status: string): 'neutral' | 'success' | 'warning' | 'danger' {
               <td class="max-w-[260px] truncate py-2 font-mono">{{ e.url }}</td>
               <td>{{ e.events.join(', ') }}</td>
               <td><Badge :tone="e.enabled ? 'success' : 'neutral'">{{ e.enabled ? 'enabled' : 'disabled' }}</Badge></td>
-              <td><Button v-if="e.enabled" @click="disable.mutate(e.id)">Disable</Button></td>
+              <td class="whitespace-nowrap">
+                <Button v-if="e.enabled" variant="secondary" :disabled="rotate.isPending.value" @click="rotate.mutate(e.id)">Rotate secret</Button>
+                <Button v-if="e.enabled" @click="disable.mutate(e.id)">Disable</Button>
+              </td>
             </tr>
           </tbody>
         </table>

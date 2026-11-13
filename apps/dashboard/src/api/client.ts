@@ -1,7 +1,7 @@
 import type {
-  ApiKey, ApiKeyCreated, Asset, AuthResponse, BlacklistCheckResult,
-  BlacklistEntry, BlacklistScope, Network, Organization, Project,
-  GasStation, GasTopUp,
+  AddressBookEntry, ApiKey, ApiKeyCreated, Asset, AuthResponse, AutoSweepRule, BlacklistCheckResult,
+  BlacklistEntry, BlacklistScope, DepositPolicy, Network, Organization, Project,
+  GasStation, GasTopUp, StaticSweepDestination, SweepPolicy, TotpEnabled, TotpSetup,
   ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
   Invoice, OrgMember, Plan, UsageSnapshot, WalletAddress, WalletBalances,
   WebhookDelivery, WebhookEndpoint, WebhookEndpointCreated, WithdrawalPolicy, WithdrawalRequest,
@@ -63,6 +63,14 @@ export const api = {
   logout: () => request<void>('POST', '/auth/logout'),
   me: () => request<User>('GET', '/me'),
 
+  // Two-factor authentication (TOTP). Setup returns the secret once;
+  // enable returns the recovery codes once.
+  verifyTotp: (payload: { mfa_token: string; code: string }) =>
+    request<AuthResponse>('POST', '/auth/2fa/verify', payload),
+  totpSetup: () => request<TotpSetup>('POST', '/auth/2fa/setup'),
+  totpEnable: (code: string) => request<TotpEnabled>('POST', '/auth/2fa/enable', { code }),
+  totpDisable: (code: string) => request<{ detail: string }>('POST', '/auth/2fa/disable', { code }),
+
   // Organizations & projects
   listOrganizations: async (): Promise<Organization[]> => listOf(await request<Organization[] | { items: Organization[] }>('GET', '/organizations')),
   createOrganization: (payload: { name: string }) =>
@@ -73,8 +81,10 @@ export const api = {
 
   // API credentials (secrets are shown once — see ApiKeysView)
   listApiKeys: async (): Promise<ApiKey[]> => listOf(await request<ApiKey[] | { items: ApiKey[] }>('GET', '/api-keys')),
-  createApiKey: (payload: { project_id: string; name: string; scopes: string[] }) =>
-    request<ApiKeyCreated>('POST', '/api-keys', payload),
+  createApiKey: (payload: {
+    project_id: string; name: string; scopes: string[];
+    ip_allowlist?: string[]; expires_at?: string | null;
+  }) => request<ApiKeyCreated>('POST', '/api-keys', payload),
   rotateApiKey: (id: string) => request<ApiKeyCreated>('POST', `/api-keys/${encodeURIComponent(id)}/rotate`),
   revokeApiKey: (id: string) => request<void>('POST', `/api-keys/${encodeURIComponent(id)}/revoke`),
 
@@ -133,7 +143,8 @@ export const api = {
   getWithdrawalPolicy: (projectId: string) =>
     request<WithdrawalPolicy>('GET', `/projects/${encodeURIComponent(projectId)}/withdrawal-policy`),
   updateWithdrawalPolicy: (projectId: string, payload: {
-    approvals_required: number; max_single_amount?: string | null; daily_limit?: string | null;
+    approvals_required: number; min_single_amount?: string | null;
+    max_single_amount?: string | null; daily_limit?: string | null;
     auto_approve_below: string; service_fee_flat: string;
   }) => request<WithdrawalPolicy>('PUT', `/projects/${encodeURIComponent(projectId)}/withdrawal-policy`, payload),
 
@@ -193,6 +204,49 @@ export const api = {
     listOf(await request<WebhookDelivery[] | { items: WebhookDelivery[] }>('GET', `/webhooks/deliveries?project_id=${encodeURIComponent(projectId)}`)),
   replayWebhookDelivery: (id: string) =>
     request<{ id: string; status: string }>('POST', `/webhooks/deliveries/${encodeURIComponent(id)}/replay`),
+
+  // Destination address book + withdrawal allowlist policy.
+  listAddressBook: async (projectId: string): Promise<AddressBookEntry[]> =>
+    listOf(await request<AddressBookEntry[] | { items: AddressBookEntry[] }>('GET', `/address-book?project_id=${encodeURIComponent(projectId)}`)),
+  addAddressBookEntry: (payload: { project_id: string; network: string; address: string; label?: string }) =>
+    request<AddressBookEntry>('POST', '/address-book', payload),
+  deleteAddressBookEntry: (id: string) => request<{ detail: string }>('DELETE', `/address-book/${encodeURIComponent(id)}`),
+  getAddressBookPolicy: (projectId: string) =>
+    request<{ project_id: string; withdrawal_allowlist_required: boolean }>('GET', `/address-book/policy?project_id=${encodeURIComponent(projectId)}`),
+  setAddressBookPolicy: (projectId: string, required: boolean) =>
+    request<{ project_id: string; withdrawal_allowlist_required: boolean }>('PATCH', '/address-book/policy', { project_id: projectId, required }),
+
+  // Deposit policies — per-asset minimums (no maximum exists by design).
+  listDepositPolicies: async (projectId: string): Promise<DepositPolicy[]> =>
+    listOf(await request<DepositPolicy[] | { items: DepositPolicy[] }>('GET', `/deposit-policies?project_id=${encodeURIComponent(projectId)}`)),
+  putDepositPolicy: (payload: { project_id: string; asset_id: string; min_amount: string }) =>
+    request<DepositPolicy>('PUT', '/deposit-policies', payload),
+
+  // Sweep policy, static destinations, auto-sweep rules.
+  getSweepPolicy: (projectId: string) =>
+    request<SweepPolicy>('GET', `/sweep-policy?project_id=${encodeURIComponent(projectId)}`),
+  putSweepPolicy: (payload: {
+    project_id: string; destination_mode: 'resolver' | 'static';
+    min_sweep_threshold: string; leave_behind: string; enabled: boolean;
+  }) => request<SweepPolicy>('PUT', '/sweep-policy', payload),
+  listStaticDestinations: async (projectId: string): Promise<StaticSweepDestination[]> =>
+    listOf(await request<StaticSweepDestination[] | { items: StaticSweepDestination[] }>('GET', `/sweep-destinations?project_id=${encodeURIComponent(projectId)}`)),
+  putStaticDestination: (payload: { project_id: string; network: string; address: string; label?: string }) =>
+    request<StaticSweepDestination>('PUT', '/sweep-destinations', payload),
+  deleteStaticDestination: (id: string) =>
+    request<{ detail: string }>('DELETE', `/sweep-destinations/${encodeURIComponent(id)}`),
+  listAutoSweepRules: async (projectId: string): Promise<AutoSweepRule[]> =>
+    listOf(await request<AutoSweepRule[] | { items: AutoSweepRule[] }>('GET', `/auto-sweep-rules?project_id=${encodeURIComponent(projectId)}`)),
+  createAutoSweepRule: (payload: {
+    wallet_id: string; network: string; asset_id: string;
+    threshold_amount: string; enabled: boolean;
+  }) => request<AutoSweepRule>('POST', '/auto-sweep-rules', payload),
+  deleteAutoSweepRule: (id: string) =>
+    request<{ detail: string }>('DELETE', `/auto-sweep-rules/${encodeURIComponent(id)}`),
+
+  // Webhook signing-secret rotation (new secret returned once).
+  rotateWebhookSecret: (id: string) =>
+    request<{ id: string; signing_secret: string }>('POST', `/webhooks/endpoints/${encodeURIComponent(id)}/rotate-secret`),
 
   // Plans & billing (Phase 11)
   listPlans: async () => listOf(await request<Plan[] | { items: Plan[] }>('GET', '/plans')),

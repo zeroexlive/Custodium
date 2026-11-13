@@ -1,10 +1,11 @@
 /** Shared API types — mirror the Phase 1 Django Ninja contracts in docs/api. */
-export interface User { id: string; email: string; display_name?: string; is_email_verified?: boolean }
+export interface User { id: string; email: string; display_name?: string; is_email_verified?: boolean; totp_enabled?: boolean }
 export interface Organization { id: string; name: string; slug?: string; role?: string; created_at?: string }
 export interface Project { id: string; organization_id: string; name: string; environment: 'sandbox' | 'production'; created_at?: string }
 export interface ApiKey {
   id: string; project_id: string; name: string; key_id: string;
   scopes: string[]; status: 'active' | 'revoked' | 'expired';
+  ip_allowlist?: string[];
   created_at?: string; expires_at?: string | null; last_used_at?: string | null;
 }
 /** Returned exactly once at creation; the secret must never be persisted client-side. */
@@ -16,7 +17,13 @@ export interface Asset {
   issuer_classification: string; verification_status: string;
   deposit_enabled?: boolean; withdrawal_enabled?: boolean;
 }
-export interface AuthResponse { access_token?: string; token?: string; user?: User }
+export interface AuthResponse {
+  access_token?: string | null; token?: string | null; user?: User;
+  /** True when the login paused at the TOTP challenge (no token yet). */
+  requires_totp?: boolean; mfa_token?: string | null;
+}
+export interface TotpSetup { secret: string; provisioning_uri: string }
+export interface TotpEnabled { detail: string; recovery_codes: string[] }
 export interface MatchedAddress { address_id: string; wallet_id: string; external_customer_id?: string | null; role: string }
 export interface Transfer { transfer_id: string; direction: 'in' | 'out'; amount_base_units: string; decimals: number; asset?: string; from?: string; to?: string }
 export interface TransactionLookup {
@@ -53,8 +60,30 @@ export interface Sweep {
 /** Gas station: per-(project, network) native-coin top-up config. */
 export interface GasStation {
   id: string; project_id: string; network: string; funding_wallet_id: string;
+  /** Where the client sends native coin to fund this station. */
+  top_up_address?: string | null;
   enabled: boolean; min_native_balance: string; topup_amount: string;
   max_topups_per_day: number;
+}
+export interface AddressBookEntry {
+  id: string; project_id: string; network: string; address: string; label: string;
+}
+export interface AutoSweepRule {
+  id: string; project_id: string; wallet_id: string; network: string;
+  asset_id: string; threshold_amount: string;
+  enabled: boolean; trigger_count: number;
+}
+export interface SweepPolicy {
+  project_id: string; destination_mode: 'resolver' | 'static';
+  min_sweep_threshold: string; leave_behind: string; enabled: boolean;
+}
+export interface StaticSweepDestination {
+  id: string; project_id: string; network: string; address: string;
+  label: string; enabled: boolean;
+}
+export interface DepositPolicy {
+  project_id: string; asset_id: string; asset: string; network: string;
+  min_amount: string;
 }
 export interface GasTopUp {
   id: string; network: string; target_wallet_id: string; amount: string;
@@ -115,6 +144,7 @@ export interface WithdrawalRequest {
 
 export interface WithdrawalPolicy {
   approvals_required: number;
+  min_single_amount?: string | null;
   max_single_amount: string | null;
   daily_limit: string | null;
   auto_approve_below: string;

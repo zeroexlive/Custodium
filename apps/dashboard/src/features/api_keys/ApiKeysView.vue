@@ -9,6 +9,7 @@ import Badge from '@/components/ui/Badge.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 
 const name = ref(''); const projectId = ref(''); const scopes = ref('wallets:read')
+const ipAllowlist = ref(''); const expiresAt = ref('')
 /**
  * The newly-created secret lives ONLY in this local ref.
  * It is never written to Pinia, storage, or the query cache,
@@ -20,7 +21,12 @@ const client = useQueryClient()
 const projects = useQuery({ queryKey: ['projects'], queryFn: api.listProjects })
 const query = useQuery({ queryKey: ['api-keys'], queryFn: api.listApiKeys })
 const create = useMutation({
-  mutationFn: () => api.createApiKey({ project_id: projectId.value, name: name.value, scopes: scopes.value.split(',').map((s) => s.trim()).filter(Boolean) }),
+  mutationFn: () => api.createApiKey({
+    project_id: projectId.value, name: name.value,
+    scopes: scopes.value.split(',').map((s) => s.trim()).filter(Boolean),
+    ip_allowlist: ipAllowlist.value.split('\n').map((s) => s.trim()).filter(Boolean),
+    expires_at: expiresAt.value ? new Date(expiresAt.value).toISOString() : null,
+  }),
   onSuccess: async (created) => { oneTimeSecret.value = created.secret; name.value = ''; await client.invalidateQueries({ queryKey: ['api-keys'] }) },
 })
 const revoke = useMutation({
@@ -57,6 +63,15 @@ function submit(): void { if (name.value.trim() && projectId.value) create.mutat
         </div>
         <Input id="key-name" v-model="name" label="Key name" required />
         <Input id="key-scopes" v-model="scopes" label="Scopes (comma-separated)" required />
+        <div class="space-y-1">
+          <label for="key-ip-allowlist" class="block text-sm font-medium">IP allowlist (optional, one per line)</label>
+          <textarea id="key-ip-allowlist" v-model="ipAllowlist" rows="2" class="w-full rounded border border-gray-300 dark:border-gray-600 bg-surface px-3 py-2 text-sm" placeholder="203.0.113.10"></textarea>
+          <p class="text-xs text-ink-muted">When set, only these source IPs can use the key. Empty means any IP.</p>
+        </div>
+        <div class="space-y-1">
+          <label for="key-expires" class="block text-sm font-medium">Expires at (optional)</label>
+          <input id="key-expires" v-model="expiresAt" type="datetime-local" class="w-full rounded border border-gray-300 dark:border-gray-600 bg-surface px-3 py-2 text-sm">
+        </div>
         <Button type="submit" :disabled="create.isPending.value">Create key</Button>
         <p v-if="create.isError.value" role="alert" class="text-sm text-danger">{{ (create.error.value as Error).message }}</p>
       </form>
@@ -67,7 +82,13 @@ function submit(): void { if (name.value.trim() && projectId.value) create.mutat
       <EmptyState v-else-if="!query.data.value?.length" title="No API keys yet" description="Create a key above. Secrets are shown only once at creation." />
       <ul v-else class="divide-y">
         <li v-for="k in query.data.value" :key="k.id" class="py-2 flex justify-between items-center gap-2">
-          <span><span class="font-medium">{{ k.name }}</span> <code class="font-mono text-xs">{{ k.key_id }}</code></span>
+          <span>
+            <span class="font-medium">{{ k.name }}</span> <code class="font-mono text-xs">{{ k.key_id }}</code>
+            <span class="block text-xs text-ink-muted">
+              <template v-if="k.ip_allowlist?.length">IPs: {{ k.ip_allowlist.join(', ') }} · </template>
+              <template v-if="k.expires_at">Expires {{ k.expires_at }}</template>
+            </span>
+          </span>
           <span class="flex items-center gap-2"><Badge :tone="k.status === 'active' ? 'success' : 'danger'">{{ k.status }}</Badge>
           <Button v-if="k.status === 'active'" type="button" variant="danger" @click="revoke.mutate(k.id)">Revoke</Button></span>
         </li>
