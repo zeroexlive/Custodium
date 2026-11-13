@@ -59,7 +59,7 @@ GitHub: `zeroexlive/Custodium`. Owner: William (GitHub `zeroexlive`).
 | 0 | Architecture & Security Research | Implemented (verified locally 2026-11-12; not Security Reviewed / Production Approved) |
 | 1 | Repository & SaaS Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #2, merge `560c56c`); CI file added by William via web UI (commit `268b5c3`, verified byte-identical); not Security Reviewed / Production Approved |
 | 2 | Wallet & Asset Foundation | Implemented — merged to `main` on GitHub 2026-11-12 (PR #3, merge `b0ba530`); not Security Reviewed / Production Approved |
-| 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned |
+| 3 | MPC Infrastructure | Implemented (evaluation) — merged to `main` 2026-11-12 (PR #4, merge `d7656b6`); cggmp21 REJECTED (see history); production signing still disabled, independent review NOT commissioned. Post-roadmap 2026-11-13: production signer service IMPLEMENTED (see history + `docs/architecture/production-signer.md`); activation still gated off pending the review |
 | 4 | Ethereum & BSC | Implemented — merged to `main` 2026-11-12 (PR #5, merge `5b04197`); live on-chain round-trip NOT verified (sandbox egress + no faucet funds; see history) |
 | 5 | Blockchain Indexing & Lookup | Implemented — merged to `main` 2026-11-12 (PR #6, merge `2fe030f`); live-chain scanning NOT verified (sandbox egress; see history) |
 | 6 | TRON | Implemented — merged to `main` 2026-11-12 (PR #7, merge `3f68a35`); live-node verification NOT done (sandbox egress; see history) |
@@ -1041,3 +1041,60 @@ a separate written approval decision; neither exists.
   validated by inspection + YAML parse only. William's
   server-side root cause remains OPEN pending his
   `docker compose logs backend` output.
+
+### 2026-11-13 — Production signer service built (post-roadmap, William's direction)
+
+- Context: William asked to mark Custodium Production Approved;
+  Muse declined (the approval gates are unmet and the status is
+  evidence-based, not declarable) and William directed building
+  the production signer instead — the one remaining buildable
+  blocker. The implementation now EXISTS for the independent
+  review. Activation remains gated and Custodium remains NOT
+  Production Approved.
+- Built: `services/mpc/crates/signer_service` (binary
+  `custodium-signer`) — one process per participant node;
+  XChaCha20-Poly1305 encrypted share store (per-node key file;
+  wrong key or tampered file = hard error); peer-to-peer protocol
+  transport over cluster-token HTTP (`round_based` Delivery for
+  CGGMP; explicit envelopes for FROST; DKG round-2 packages go
+  point-to-point; the coordinator starts sessions and collects
+  public results, never relays shares); coordinator client API
+  `/v1` (create key = aux + DKG, public key, sign). Phase 3 pins
+  unchanged (cggmp24 =0.7.0-alpha.2, frost-ed25519 =3.0.0);
+  Cargo.lock updated (axum, reqwest, chacha20poly1305, …).
+- Django: `waas/modules/mpcsigner` client implementing both
+  signer ports with fail-closed error mapping (trust_env=False);
+  dispatch factories use it ONLY when `MPC_SIGNER_ENABLED=true`
+  AND `MPC_SIGNER_URL` are set (defaults off; all four
+  combinations pinned by tests); 9 new client/gate tests.
+- Verified: `cargo test --workspace` **20 passed / 0 failed**.
+  Service tests (three nodes, separate stores and store keys,
+  real HTTP): FROST DKG + sign with quorum [0,2] verified by
+  ed25519-zebra, plus a full node-set restart over the encrypted
+  stores signing again; ECDSA DKG (incl. aux generation) +
+  signing of the Phase 4 Sepolia sighash with k256 ecrecover ==
+  group address (249 s test). Store unit tests (round-trip,
+  wrong key, tamper). Live binaries: three `custodium-signer`
+  processes driven by curl — FROST DKG + quorum [1,2] signature
+  verified with Python `cryptography`; a persisted-store ECDSA
+  signature likewise verified with `cryptography`. Backend:
+  pytest **187 passed / 1 skipped** (JUnit report), ruff clean.
+- Bugs the tests caught (fixed and re-verified): (1) signing
+  sessions must translate between keygen party indices and
+  session indices (a [0,2] quorum is session parties 0 and 1) —
+  the first ECDSA run aborted with SenderIndexOutOfRange; the
+  delivery layer now takes the session's participant list;
+  (2) the two service tests collided on hardcoded ports when
+  cargo ran them in parallel (AddrInUse) — disjoint port sets.
+- Docs: `docs/architecture/production-signer.md` (design +
+  limitations: bearer tokens not mTLS, no cggmp24 key refresh,
+  no identifiable abort, in-memory session state); review
+  evidence checklist item 7, commissioning brief, and the
+  readiness checklist updated (signer = built, review open);
+  Phase 3 status line updated above.
+- NOT verified: multi-host deployment (all nodes shared this VM
+  and loopback), TLS/mTLS transport, mid-ceremony node failure
+  beyond protocol aborts — and the independent review itself,
+  which now has an implementation to review. Remaining gates
+  unchanged: commission the review, pentest, legal, funded
+  testnet soaks, live drills, written approval decision.

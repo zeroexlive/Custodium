@@ -1,10 +1,16 @@
 # Custodium MPC workspace.
-# Production crates remain fail-closed skeletons: no threshold signing
-# is implemented in them. Phase 3 adds ONE exception: the test-only
-# evaluation harness (crates/eval_harness), which pins the candidate
-# libraries to evaluate them with ephemeral in-memory keys. The
-# harness is never linked into production binaries. See
-# docs/mpc/phase-3-evaluation.md and README.md.
+# Phase 3 added the test-only evaluation harness
+# (crates/eval_harness), which pins the candidate libraries and
+# evaluated them with ephemeral in-memory keys.
+# Post-roadmap (2026-11-13, at William's direction) the production
+# signer implementation lives in crates/signer_service: real
+# threshold ceremonies over a peer transport with encrypted share
+# storage, built so the independent review has an implementation to
+# review. It is NOT activated: the Django wiring keeps the
+# fail-closed signers unless an explicit default-off gate is opened,
+# and Custodium remains NOT Security Reviewed / NOT Production
+# Approved until the review in docs/mpc/review/ passes. See
+# docs/architecture/production-signer.md.
 [workspace]
 resolver = "2"
 members = ["crates/*"]
@@ -19,14 +25,15 @@ rust-version = "1.74"
 # Internal crates (path only).
 custodium-mpc-shared = { path = "crates/shared" }
 
-# --- External threshold-cryptography candidates ---
-# Phase 3 (2026-11-12): versions are pinned ONLY inside
-# crates/eval_harness (test-only evaluation):
+# --- External threshold-cryptography libraries ---
+# Phase 3 (2026-11-12) pinned, inside the evaluation harness:
 #   cggmp24 = "=0.7.0-alpha.2"   (CGGMP family, threshold ECDSA;
 #     cggmp21 was rejected — see docs/mpc/phase-3-evaluation.md §CVE)
 #   frost-ed25519 = "=3.0.0"      (FROST, RFC 9591, Ed25519)
-# Production crates must not depend on them until the independent
-# cryptographic review (docs/mpc/review/) is complete.
+# crates/signer_service uses the same pins for the production
+# signer implementation (built 2026-11-13 at William's direction so
+# the implementation can be reviewed; activation remains gated on
+# the independent review — docs/mpc/review/).
 # tonic / prost (gRPC stack) are likewise deferred until the proto
 # codegen approach is reviewed; the .proto contract lives in
 # ../../packages/proto.
