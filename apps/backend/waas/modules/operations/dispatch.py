@@ -58,10 +58,29 @@ def default_provider(network: BlockchainNetwork):
 
 
 def default_ecdsa_signer():
+    # The MPC signer service is used only when the operator has
+    # explicitly opened the gate (MPC_SIGNER_ENABLED + MPC_SIGNER_URL
+    # in waas.modules.mpcsigner.client); otherwise fail closed.
+    from waas.modules.mpcsigner.client import (
+        RemoteEcdsaSigner,
+        default_client,
+        signer_enabled,
+    )
+
+    if signer_enabled():
+        return RemoteEcdsaSigner(default_client())
     return UnavailableSigner()
 
 
 def default_ed25519_signer():
+    from waas.modules.mpcsigner.client import (
+        RemoteEd25519Signer,
+        default_client,
+        signer_enabled,
+    )
+
+    if signer_enabled():
+        return RemoteEd25519Signer(default_client())
     return UnavailableEd25519Signer()
 
 

@@ -28,7 +28,7 @@ Updated: 2026-11-13 (production-readiness pass).
 | Gate | Status | Notes |
 |---|---|---|
 | Independent threshold-crypto review (Engagement A) | ❌ Open | Package + sendable brief ready: `docs/mpc/review/` incl. `commissioning-brief.md`. **Gates production signing.** |
-| Production signer implementation (transport, share storage, ceremony orchestration) + its implementation review | ❌ Open | Phase 3 evaluated the cryptography in a harness; the production signer service is design-stage (evidence checklist item 7) and must be built, then reviewed |
+| Production signer implementation (transport, share storage, ceremony orchestration) + its implementation review | ⚠️ Built, review open | Implementation built 2026-11-13 (`services/mpc/crates/signer_service`, `docs/architecture/production-signer.md`) and locally tested; the implementation review (Engagement A scope) has not happened, and the Django activation gate stays off until it passes |
 | Independent penetration test (Engagement B) | ❌ Open | Brief in the same commissioning document |
 | Legal / compliance review | ❌ Open | Custody licensing per operating jurisdiction |
 | Funded testnet soaks, all five chains (deposit → credit → withdrawal → sweep, reconciliation clean) | ❌ Open | Requires network egress + faucet funds; never executed from the dev sandbox |

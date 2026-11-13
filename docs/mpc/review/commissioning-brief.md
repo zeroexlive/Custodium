@@ -46,11 +46,14 @@ Everything in `docs/mpc/review/evidence-checklist.md`, including:
   call with the builder.
 
 Known honesty items, stated up front: the production signer
-transport/implementation does not exist yet (Phase 3 evaluated the
-cryptography; the production path is design-stage — scope §B.5–B.9
-are design questions for now and become an implementation review
-later); no live-chain verification has been performed; the
-platform's own readiness checklist is
+implementation now exists (built 2026-11-13, after this brief's
+first version — `services/mpc/crates/signer_service`, design and
+limitations in `docs/architecture/production-signer.md`) and
+scope §B.5–B.9 are therefore implementation-review items now,
+not design questions; the signer is NOT activated (Django gate
+off by default) and nothing here has been independently reviewed;
+no live-chain verification has been performed; the platform's own
+readiness checklist is
 `docs/operations/production-readiness-checklist.md`.
 
 ## 3. What we need from you in reply

@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "waas.modules.webhooks",
     "waas.modules.plans",
     "waas.modules.gasstation",
+    "waas.modules.mpcsigner",
 ]
 
 MIDDLEWARE = [
@@ -124,6 +125,16 @@ DASHBOARD_TOKEN_TTL_HOURS = int(env("DASHBOARD_TOKEN_TTL_HOURS", "12"))
 EMAIL_VERIFICATION_TTL_HOURS = int(env("EMAIL_VERIFICATION_TTL_HOURS", "24"))
 HMAC_TIMESTAMP_WINDOW_SECONDS = 300
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
+
+# MPC signer service (Rust, services/mpc/crates/signer_service).
+# The dispatch factories use the remote signer ONLY when the
+# operator has explicitly enabled it AND configured a URL — both,
+# so neither a stray URL nor a stray flag can activate signing.
+# Default state (and the state until the independent cryptographic
+# review passes): disabled, fail-closed signers.
+MPC_SIGNER_ENABLED = env_bool("MPC_SIGNER_ENABLED", False)
+MPC_SIGNER_URL = env("MPC_SIGNER_URL", "")
+MPC_SIGNER_TOKEN = env("MPC_SIGNER_TOKEN", "")
 
 LOGGING = {
     "version": 1,
