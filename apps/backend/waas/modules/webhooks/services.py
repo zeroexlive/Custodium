@@ -22,8 +22,13 @@ import httpx
 from django.db import transaction
 from django.utils import timezone
 
+from waas.common.http_pinning import pinned_httpx_client
 from waas.modules.projects.models import Project
-from waas.modules.sweeps.resolver import ResolutionError, validate_endpoint_url
+from waas.modules.sweeps.resolver import (
+    ResolutionError,
+    validate_endpoint_url,
+    validated_host_ips,
+)
 from waas.security.secret_management.crypto import decrypt_secret, encrypt_secret
 
 from .models import (
@@ -116,7 +121,7 @@ def attempt_delivery(
         validate_kwargs = {}
         if dns_resolver is not None:
             validate_kwargs["dns_resolver"] = dns_resolver
-        validate_endpoint_url(endpoint.url, **validate_kwargs)
+        wh_host, wh_ips = validated_host_ips(endpoint.url, **validate_kwargs)
     except ResolutionError as exc:
         delivery.last_error = f"endpoint validation failed: {exc.stage}: {exc.message}"
         return _schedule_retry(delivery, now)
@@ -129,8 +134,9 @@ def attempt_delivery(
         "X-WaaS-Event-Type": delivery.event.event_type,
         "WaaS-Signature": f"t={timestamp},v1={sign(secret, timestamp, body)}",
     }
-    client = http_client or httpx.Client(
-        timeout=httpx.Timeout(10.0, connect=3.0), follow_redirects=False, trust_env=False
+    # Pin the socket to the validated IP (DNS-rebinding defence).
+    client = http_client or pinned_httpx_client(
+        host=wh_host, ip=wh_ips[0], timeout=httpx.Timeout(10.0, connect=3.0)
     )
     try:
         response = client.post(endpoint.url, content=body, headers=headers)

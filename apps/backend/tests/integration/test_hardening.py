@@ -31,9 +31,10 @@ def _raw(sql: str, params: tuple = ()) -> None:
 
 def test_append_only_triggers_installed_and_enforced() -> None:
     with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT name FROM sqlite_master WHERE type='trigger'"
-        )
+        if connection.vendor == "postgresql":
+            cursor.execute("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")
+        else:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='trigger'")
         triggers = {row[0] for row in cursor.fetchall()}
     for table in (
         "ledger_journal_entry", "ledger_journal_line", "audit_audit_event",
