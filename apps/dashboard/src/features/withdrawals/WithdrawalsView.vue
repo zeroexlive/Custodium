@@ -135,7 +135,7 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
         <table v-else class="mt-3 w-full text-sm">
           <thead>
             <tr class="text-left text-slate-500">
-              <th class="py-1">Created</th><th>Asset</th><th>Amount</th><th>Destination</th>
+              <th class="py-1">Created</th><th>Asset</th><th>Amount</th><th>Destination</th><th>Customer UID</th>
               <th>Status</th><th>Approvals</th><th>Fee (actual)</th><th></th>
             </tr>
           </thead>
@@ -145,6 +145,7 @@ function statusTone(status: string): 'neutral' | 'success' | 'warning' | 'danger
               <td>{{ r.asset }} · {{ r.network }}</td>
               <td class="font-mono">{{ r.amount }}</td>
               <td class="max-w-[180px] truncate font-mono">{{ r.destination_address }}</td>
+              <td>{{ r.external_customer_id || '—' }}</td>
               <td>
                 <Badge :tone="statusTone(r.status)">{{ r.status }}</Badge>
                 <span v-if="r.status_reason" class="block text-xs text-slate-500">{{ r.status_reason }}</span>

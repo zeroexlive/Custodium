@@ -46,8 +46,16 @@ async function submit(): Promise<void> {
       <h3 class="font-medium mt-4">Matched addresses</h3>
       <p v-if="!result.matched_addresses.length" class="text-sm text-ink-muted">None of your addresses participated in this transaction.</p>
       <ul v-else class="text-sm divide-y">
-        <li v-for="a in result.matched_addresses" :key="a.address_id" class="py-1">{{ a.role }} — wallet {{ a.wallet_id }}<span v-if="a.external_customer_id"> — {{ a.external_customer_id }}</span></li>
+        <li v-for="a in result.matched_addresses" :key="a.address_id" class="py-1">{{ a.role }} — wallet {{ a.wallet_id }}<span v-if="a.external_customer_id"> — customer UID {{ a.external_customer_id }}</span></li>
       </ul>
+      <template v-if="result.tenant_record?.type === 'withdrawal'">
+        <h3 class="font-medium mt-4">Withdrawal requested by</h3>
+        <p class="text-sm">
+          Customer UID <span class="font-mono">{{ result.tenant_record.external_customer_id || '—' }}</span>
+          <span v-if="result.tenant_record.external_reference"> · their reference: {{ result.tenant_record.external_reference }}</span>
+          <span v-if="result.tenant_record.withdrawal_request_id"> · request {{ result.tenant_record.withdrawal_request_id }}</span>
+        </p>
+      </template>
       <h3 class="font-medium mt-4">Transfers</h3>
       <p v-if="!result.transfers.length" class="text-sm text-ink-muted">No relevant transfers parsed.</p>
       <ul v-else class="text-sm divide-y">

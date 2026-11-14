@@ -39,6 +39,46 @@ const create = useMutation({
   },
   onError: (e) => { createError.value = e instanceof Error ? e.message : 'Request failed' },
 })
+
+// Deposit addresses by customer UID — manual mode: the customer
+// types the end user's UID from their own platform plus the chain,
+// and receives that user's deposit address (the customer's server
+// can do exactly the same through the API).
+const uidInput = ref('')
+const uidNetwork = ref('ethereum')
+const uidResult = ref('')
+const uidError = ref('')
+const createByUid = useMutation({
+  mutationFn: () => api.createDepositAddress({
+    project_id: projectId.value,
+    external_customer_id: uidInput.value.trim(),
+    network: uidNetwork.value,
+  }),
+  onSuccess: (data) => {
+    uidResult.value = `${data.address} (wallet ${data.wallet_status})`
+    uidError.value = ''
+    void queryClient.invalidateQueries({ queryKey: ['deposit-address-search'] })
+  },
+  onError: (e) => { uidError.value = e instanceof Error ? e.message : 'Request failed'; uidResult.value = '' },
+})
+
+// Address search — by address (finds the owning UID) or by UID
+// (lists every address for that user), with status and the deposit
+// summary used for troubleshooting.
+const searchAddress = ref('')
+const searchUid = ref('')
+const searchParams = ref<{ address?: string; external_customer_id?: string } | null>(null)
+const searchResults = useQuery({
+  queryKey: computed(() => ['deposit-address-search', projectId.value, searchParams.value]),
+  queryFn: () => api.listDepositAddresses({ project_id: projectId.value, ...(searchParams.value ?? {}) }),
+  enabled: computed(() => projectId.value !== '' && searchParams.value !== null),
+})
+function runSearch(): void {
+  searchParams.value = {
+    address: searchAddress.value.trim() || undefined,
+    external_customer_id: searchUid.value.trim() || undefined,
+  }
+}
 </script>
 <template>
   <div class="space-y-6">
@@ -62,6 +102,87 @@ const create = useMutation({
         <p v-if="createdAddress" class="font-mono text-sm break-all">{{ createdAddress }}</p>
       </div>
       <p v-if="createError" role="alert" class="mt-2 text-sm text-danger">{{ createError }}</p>
+    </Card>
+
+    <Card title="Deposit address by customer UID">
+      <p class="text-sm text-ink-muted">
+        Manual mode: enter the end user's UID from your own platform and the
+        chain — the user's wallet is found or created and its deposit address
+        for that chain is returned. (Your server can do the same via
+        <span class="font-mono text-xs">POST /deposit-addresses</span>.) Uses the
+        project selected below; a wallet that has not been provisioned yet
+        returns an error instead of a fabricated address.
+      </p>
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="text-sm">
+          <span class="mb-1 block text-ink-muted">User UID</span>
+          <input v-model="uidInput" type="text" placeholder="e.g. user-12345"
+            class="rounded-lg border border-line bg-white px-3 py-2" />
+        </label>
+        <label class="text-sm">
+          <span class="mb-1 block text-ink-muted">Network</span>
+          <select v-model="uidNetwork" class="rounded-lg border border-line bg-white px-3 py-2">
+            <option v-for="n in networks.data.value ?? []" :key="n.slug" :value="n.slug">{{ n.slug }}</option>
+          </select>
+        </label>
+        <Button :disabled="!projectId || !uidInput.trim() || createByUid.isPending.value" @click="createByUid.mutate()">
+          Get deposit address
+        </Button>
+        <p v-if="uidResult" class="font-mono text-sm break-all">{{ uidResult }}</p>
+      </div>
+      <p v-if="uidError" role="alert" class="mt-2 text-sm text-danger">{{ uidError }}</p>
+    </Card>
+
+    <Card title="Search addresses">
+      <p class="text-sm text-ink-muted">
+        Search by address to find which customer UID it belongs to, or by UID
+        to list all of that user's addresses — with each address's status and
+        deposit summary for troubleshooting. Uses the project selected below.
+      </p>
+      <div class="mt-3 flex flex-wrap items-end gap-3">
+        <label class="text-sm">
+          <span class="mb-1 block text-ink-muted">Address contains</span>
+          <input v-model="searchAddress" type="text" placeholder="0x…"
+            class="rounded-lg border border-line bg-white px-3 py-2 font-mono" />
+        </label>
+        <label class="text-sm">
+          <span class="mb-1 block text-ink-muted">Customer UID</span>
+          <input v-model="searchUid" type="text" placeholder="user-12345"
+            class="rounded-lg border border-line bg-white px-3 py-2" />
+        </label>
+        <Button :disabled="!projectId || searchResults.isFetching.value" @click="runSearch()">Search</Button>
+      </div>
+      <div v-if="searchParams" class="mt-4">
+        <p v-if="searchResults.isPending.value">Loading…</p>
+        <p v-else-if="searchResults.isError.value" role="alert" class="text-sm text-danger">Search failed.</p>
+        <EmptyState v-else-if="!(searchResults.data.value ?? []).length" title="No addresses found"
+          description="No deposit addresses in this project match that search." />
+        <div v-else class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-left border-b">
+              <th scope="col" class="py-2 pr-3">Network</th><th scope="col" class="py-2 pr-3">Address</th>
+              <th scope="col" class="py-2 pr-3">Customer UID</th><th scope="col" class="py-2 pr-3">Wallet status</th>
+              <th scope="col" class="py-2 pr-3">Status</th><th scope="col" class="py-2 pr-3">Deposits</th>
+              <th scope="col" class="py-2">Credited totals</th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="a in searchResults.data.value" :key="a.id" class="border-b align-top">
+                <td class="py-2 pr-3">{{ a.network }}</td>
+                <td class="py-2 pr-3 font-mono text-xs break-all">{{ a.address }}</td>
+                <td class="py-2 pr-3">{{ a.external_customer_id || '—' }}</td>
+                <td class="py-2 pr-3"><Badge :tone="a.wallet_status === 'active' ? 'success' : 'neutral'">{{ a.wallet_status }}</Badge></td>
+                <td class="py-2 pr-3"><Badge :tone="a.status === 'active' ? 'success' : 'neutral'">{{ a.status }}</Badge></td>
+                <td class="py-2 pr-3">{{ a.deposits.count }}<span v-if="a.deposits.held_count"> ({{ a.deposits.held_count }} held)</span></td>
+                <td class="py-2 font-mono text-xs">
+                  <span v-if="a.deposits.credited_totals.length">
+                    {{ a.deposits.credited_totals.map((t) => `${t.amount} ${t.asset}`).join(', ') }}
+                  </span><span v-else>—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </Card>
 
     <Card title="Select wallet">

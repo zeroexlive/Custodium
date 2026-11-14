@@ -12,6 +12,7 @@ from waas.modules.organizations.api.router import WRITE_ROLES
 from waas.modules.organizations.models import Membership
 from waas.modules.wallets.api.schemas import (
     AddressCreateIn,
+    DepositAddressIn,
     ResolveIn,
     WalletIn,
     WalletStatusIn,
@@ -76,6 +77,24 @@ def create_wallet(
             "wallet.created", actor_user=request.auth,
             organization=project.organization, project=project,
             metadata={"wallet_id": str(wallet.id), "via": "dashboard"},
+        )
+    # A gas sponsor must exist for the project whenever wallets are
+    # created: ensure the per-(project, network) gas-station setup is
+    # in place. Project creation already ran it; this keeps the
+    # guarantee at the wallet-creation point too and heals projects
+    # created before the auto-setup existed (checked first so the
+    # idempotent setup — and its audit event — only runs when the
+    # funding wallet is actually missing).
+    from waas.modules.gasstation.services import (
+        GAS_STATION_EXTERNAL_ID,
+        setup_project_gas_station,
+    )
+
+    if not Wallet.objects.filter(
+        project=project, external_customer_id=GAS_STATION_EXTERNAL_ID
+    ).exists():
+        setup_project_gas_station(
+            project, actor_user=None if is_machine(request) else request.auth
         )
     return Status(201, wallet_out(wallet))
 
@@ -236,6 +255,196 @@ def create_address(request, wallet_id: str, payload: AddressCreateIn):
         },
     )
     return Status(201, address_out(record))
+
+
+# ------------------------------------------------------------ deposit addresses
+# A deposit address belongs to one of the customer's end users,
+# identified by the customer's own UID (the wallet's
+# external_customer_id). Manual mode = the customer enters the UID
+# in the dashboard; API mode = the customer's server sends the UID
+# and the chain and receives the address. Both hit the same service
+# path below; a UID's wallet is found or created, and the address is
+# derived from the wallet's MPC group public key — never fabricated
+# for an unprovisioned wallet (409).
+
+
+def _deposit_address_out(address: Address, *, created: bool | None = None) -> dict:
+    from waas.modules.indexing.models import ObservedDeposit
+
+    wallet = address.wallet
+    deposits = ObservedDeposit.objects.filter(address=address).select_related("asset")
+    credited: dict[str, int] = {}
+    held = 0
+    total = 0
+    for deposit in deposits:
+        total += 1
+        if deposit.held:
+            held += 1
+        if deposit.status == ObservedDeposit.Status.CREDITED:
+            symbol = deposit.asset.symbol
+            credited[symbol] = credited.get(symbol, 0) + int(deposit.amount)
+    result = {
+        **address_out(address),
+        "external_customer_id": wallet.external_customer_id,
+        "wallet_status": wallet.status,
+        "wallet_label": wallet.label,
+        "deposits": {
+            "count": total,
+            "held_count": held,
+            "credited_totals": [
+                {"asset": symbol, "amount": str(amount)}
+                for symbol, amount in sorted(credited.items())
+            ],
+        },
+    }
+    if created is not None:
+        result["created"] = created
+    return result
+
+
+@router.post(
+    "/deposit-addresses",
+    response={201: dict, 200: dict, 403: dict, 404: dict, 409: dict, 422: dict},
+    auth=any_auth,
+)
+def create_deposit_address(request, payload: DepositAddressIn):
+    """Create (or return) the deposit address for a customer UID on
+    one network. Find-or-creates the UID's wallet in the project;
+    the address itself is derived from the wallet's recorded group
+    public key, so an unprovisioned wallet returns an honest 409
+    (provision it from the dashboard first) instead of a fabricated
+    address."""
+    if is_machine(request) and not has_any_scope(request, "addresses:write", "wallets:write", "write"):
+        raise HttpError(403, "Missing required scope: addresses:write")
+    project = resolve_project(request, payload.project_id, write=True)
+    uid = payload.external_customer_id.strip()
+    if not uid or len(uid) > 128:
+        raise HttpError(422, "external_customer_id (the customer's user UID) is required")
+    from waas.modules.gasstation.services import GAS_STATION_EXTERNAL_ID
+
+    if uid == GAS_STATION_EXTERNAL_ID:
+        raise HttpError(422, "that UID is reserved for the project's gas station")
+    network = BlockchainNetwork.objects.filter(slug=payload.network.strip()).first()
+    if network is None:
+        raise HttpError(422, f"unknown network: {payload.network}")
+
+    from django.db import transaction
+
+    # The wallet find-or-create commits on its own: when the wallet
+    # is not provisioned yet the endpoint answers 409, and the
+    # wallet row must SURVIVE that answer so an operator can
+    # provision it and the caller can retry.
+    with transaction.atomic():
+        wallet = (
+            Wallet.objects.filter(project=project, external_customer_id=uid)
+            .order_by("created_at")
+            .first()
+        )
+        if wallet is None:
+            from waas.modules.plans import services as plan_services
+
+            try:
+                plan_services.check_wallet_quota(project)
+            except plan_services.QuotaExceeded as exc:
+                raise HttpError(403, str(exc)) from exc
+            wallet = Wallet.objects.create(
+                project=project,
+                label=f"Customer {uid}",
+                external_customer_id=uid,
+            )
+            AuditEvent.record(
+                "wallet.created",
+                actor_user=None if is_machine(request) else request.auth,
+                organization=project.organization,
+                project=project,
+                metadata={
+                    "wallet_id": str(wallet.id),
+                    "via": "deposit_address",
+                    "external_customer_id": uid,
+                },
+            )
+            if not Wallet.objects.filter(
+                project=project, external_customer_id=GAS_STATION_EXTERNAL_ID
+            ).exists():
+                from waas.modules.gasstation.services import setup_project_gas_station
+
+                setup_project_gas_station(
+                    project, actor_user=None if is_machine(request) else request.auth
+                )
+    existing = Address.objects.filter(wallet=wallet, network=network).first()
+    if existing is not None:
+        return Status(200, _deposit_address_out(existing, created=False))
+    from waas.modules.wallets.provisioning import (
+        ProvisioningUnavailable,
+        derive_address_for_network,
+    )
+    from waas.modules.wallets.services import record_derived_address
+
+    try:
+        derived = derive_address_for_network(wallet, network)
+    except ProvisioningUnavailable as exc:
+        raise HttpError(
+            409,
+            f"wallet {wallet.id} for this UID is not provisioned yet: {exc}",
+        ) from exc
+    key_ref = (
+        wallet.ecdsa_key_ref
+        if network.slug.startswith(("ethereum", "bsc", "tron"))
+        else wallet.ed25519_key_ref
+    )
+    with transaction.atomic():
+        record = record_derived_address(
+            wallet=wallet,
+            network=network,
+            address=derived,
+            derivation_path=f"signer-service:{key_ref}",
+        )
+        AuditEvent.record(
+            "deposit_address.created",
+            actor_user=None if is_machine(request) else request.auth,
+            organization=project.organization,
+            project=project,
+            metadata={
+                "wallet_id": str(wallet.id),
+                "external_customer_id": uid,
+                "network": network.slug,
+                "via": "api_key" if is_machine(request) else "dashboard",
+            },
+        )
+    return Status(201, _deposit_address_out(record, created=True))
+
+
+@router.get("/deposit-addresses", response=dict, auth=any_auth)
+def list_deposit_addresses(
+    request,
+    project_id: str | None = None,
+    external_customer_id: str | None = None,
+    address: str | None = None,
+    network: str | None = None,
+):
+    """Search a project's deposit addresses — by address, by
+    customer UID, or both — with each address's status and deposit
+    summary for troubleshooting."""
+    if is_machine(request) and not has_any_scope(request, "addresses:read", "wallets:read", "read"):
+        raise HttpError(403, "Missing required scope: addresses:read")
+    project = resolve_project(request, project_id)
+    addresses = (
+        Address.objects.select_related("wallet", "network")
+        .filter(wallet__project=project)
+        .order_by("created_at")
+    )
+    if external_customer_id is not None:
+        addresses = addresses.filter(wallet__external_customer_id=external_customer_id.strip())
+    if address:
+        needle = address.strip()
+        from django.db.models import Q
+
+        addresses = addresses.filter(
+            Q(address__icontains=needle) | Q(normalized_address__icontains=needle.lower())
+        )
+    if network:
+        addresses = addresses.filter(network__slug=network.strip())
+    return paginated(_deposit_address_out(a) for a in addresses)
 
 
 @router.post("/addresses/resolve", response=dict, auth=any_auth)

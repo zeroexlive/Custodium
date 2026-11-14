@@ -1466,3 +1466,98 @@ a separate written approval decision; neither exists.
   rehearsal proved the same flow for a regular wallet; the
   funding wallet differs only in label/external id). Status
   unchanged: NOT Production Approved.
+
+### 2026-11-14 — Access control: admin-created accounts only + dashboard auth fix + UID deposit workflow (William's specification)
+- **Public registration REMOVED.** `POST /auth/register` no longer
+  exists (404). Customer accounts are created ONLY by the platform
+  owner / global administrators: `POST /admin/customers` +
+  `GET /admin/customers` (dashboard auth; requires `is_staff` or
+  `is_superuser`, else 403). Creation generates a compliant
+  20-character temporary password, marks the account email-verified
+  (admin-vouched), emails the credentials via Django mail
+  (`credentials_email_sent` reports transport success honestly) and
+  returns the password ONCE to the creating admin for out-of-band
+  delivery; only the hash is stored. Audited
+  `user.created_by_admin` (never the password). Customers can only
+  log in (login / TOTP / password-reset flows unchanged).
+  `UserOut` now carries `is_staff`/`is_superuser`. Dashboard: the
+  registration form, client call and store action are removed;
+  `/register` remains only as a public "registration is closed"
+  signpost (a file deletion cannot travel the snapshot push path,
+  and old links get an explanation instead of a dead end); a new
+  **Customers** view (nav entry visible only to staff/superusers)
+  lists accounts and creates customers with the shown-once
+  password panel; first-run docs (README, installation-dev,
+  deployment-1-server-dev, feature matrix) now describe
+  `createsuperuser` → admin-created customers, and the
+  register-500 troubleshooting probes use `/auth/login` (401 =
+  backend alive).
+- **Dashboard unauthenticated-access bug FIXED.** Root cause: the
+  router guard treated ANY cookie (`document.cookie.length > 0`)
+  as a session hint and skipped the check entirely in DEV builds,
+  so a first-time visitor could open protected pages without
+  logging in. The guard is now strict and async: every non-public
+  route awaits `auth.ensureSession()`, which validates the stored
+  token against `GET /me` and redirects to `/login?redirect=...`
+  on any failure; the only public routes are `/login` and the
+  closed-registration signpost at `/register` (`/login` also
+  redirects already-authenticated users to `/`). Login honours
+  the redirect target. New store tests cover: no token → false,
+  stale token → false + cleared, confirmed token → true.
+- **Deposit addresses by customer UID** (`POST/GET
+  /deposit-addresses`, wallets router): payload UID
+  (`external_customer_id`) + network slug. Find-or-creates the
+  UID's wallet in the project (quota-checked, audited; the
+  reserved `gas-station` UID is rejected 422), then returns the
+  existing address (200) or derives + records it from the wallet's
+  group public key (201). Unprovisioned wallet → 409 with the
+  wallet row KEPT (the find-or-create commits separately —
+  raising inside the atomic block rolled it back; caught by
+  test). Manual mode = dashboard Addresses view UID entry;
+  API mode = the same endpoint with an API key
+  (addresses:write scope). `GET /deposit-addresses` searches by
+  address (→ owning UID) and/or by UID (→ all addresses),
+  tenant-scoped, each row with wallet/address status and an
+  ObservedDeposit summary (count, held count, credited totals by
+  asset) for troubleshooting.
+- **Wallet creation guarantees the gas sponsor:** `POST /wallets`
+  now runs the idempotent gas-station setup when the project's
+  funding wallet is missing (project creation already did; this
+  keeps William's "wallet created → gas sponsor address" rule at
+  the wallet-creation point and heals pre-auto-setup projects;
+  existence-checked first so no duplicate audit events).
+- **Tx hash → requesting UID:** transaction lookup already
+  returned the wallet's `external_customer_id` in
+  `matched_addresses`/`tenant_record`; the withdrawal tenant
+  record now also links the `WithdrawalRequest`
+  (`withdrawal_request_id`, `external_reference`) via
+  `chain_tx_hash`, and the withdrawals API serializer + dashboard
+  list expose `external_customer_id`, with a "Withdrawal requested
+  by" panel in the Transaction Explorer.
+- Workflow re-verified against the code for the remaining items:
+  org → projects → wallets (existing); gas sponsor top-up is
+  manual via the funding wallet's per-network `top_up_address`
+  (Gas Station view) and the dispatch preflight tops up
+  below-threshold wallets before sweeps (existing, threshold +
+  configured amount — NOT an exact per-deposit fee); hot wallet
+  destination = static (manual, editable in Sweep Settings) or
+  resolver API mode (fetched fresh per sweep, snapshotted —
+  existing PR #24/#25 behaviour); deposit support check = the
+  scanners only record registered assets, deposit minimum
+  held-and-accumulate (PR #24), sweep requires an auto-sweep rule
+  or a manual sweep (unchanged nuance).
+- Tests: conftest `register_user` now provisions users via ORM +
+  `DashboardToken.issue` (public registration is gone);
+  test_phase1_acceptance rewritten (public register 404;
+  admin-only creation incl. locmem email containing the temporary
+  password, customer login with it, duplicate 409, non-admin 403);
+  new tests/integration/test_deposit_addresses.py (7). Full
+  backend suite **232 passed / 1 skipped**, ruff clean; frontend
+  `npm run build` green, vitest **28 passed** (3 new ensureSession
+  + 4 new client tests).
+- NOT verified: browser-driven run of the new guard against a live
+  backend (guard logic is unit-tested at the store level; the
+  router awaits the same action); live SMTP delivery (locmem /
+  console backends only — production mail transport is deployment
+  configuration, and failure is reported, never hidden). Status
+  unchanged: NOT Production Approved.

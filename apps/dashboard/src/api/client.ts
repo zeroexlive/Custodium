@@ -1,6 +1,6 @@
 import type {
   AddressBookEntry, ApiKey, ApiKeyCreated, Asset, AuditLogEntry, AuthResponse, AutoSweepRule, BlacklistCheckResult,
-  BlacklistEntry, BlacklistScope, DepositPolicy, Network, Organization, Project,
+  BlacklistEntry, BlacklistScope, CustomerAccount, CustomerCreated, DepositAddressRecord, DepositPolicy, Network, Organization, Project,
   GasStation, GasTopUp, StaticSweepDestination, SweepPolicy, TotpEnabled, TotpSetup,
   ProjectBalances, Sweep, SweepDestinationEndpoint, SweepEndpointHistoryRow, TransactionLookup, DepositRecord, User, Wallet,
   Invoice, OrgMember, Plan, UsageSnapshot, WalletAddress, WalletBalances,
@@ -55,9 +55,8 @@ function listOf<T>(data: T[] | { items: T[] }): T[] {
 }
 
 export const api = {
-  // Auth / identity
-  register: (payload: { email: string; password: string; display_name?: string }) =>
-    request<AuthResponse>('POST', '/auth/register', payload),
+  // Auth / identity. There is no public registration: customer
+  // accounts are created by platform administrators (below).
   login: (payload: { email: string; password: string }) =>
     request<AuthResponse>('POST', '/auth/login', payload),
   logout: () => request<void>('POST', '/auth/logout'),
@@ -122,6 +121,27 @@ export const api = {
     const query = network ? `?network=${encodeURIComponent(network)}` : ''
     return listOf(await request<WalletAddress[] | { items: WalletAddress[] }>('GET', `/wallets/${encodeURIComponent(walletId)}/addresses${query}`))
   },
+
+  // Deposit addresses by customer UID — manual mode (dashboard) and
+  // the customer's API mode share this endpoint: send a UID + chain,
+  // receive the user's deposit address. Search by address or by UID.
+  createDepositAddress: (payload: { project_id: string; external_customer_id: string; network: string }) =>
+    request<DepositAddressRecord>('POST', '/deposit-addresses', payload),
+  listDepositAddresses: async (params: { project_id: string; external_customer_id?: string; address?: string; network?: string }): Promise<DepositAddressRecord[]> => {
+    const query = new URLSearchParams()
+    query.set('project_id', params.project_id)
+    if (params.external_customer_id) query.set('external_customer_id', params.external_customer_id)
+    if (params.address) query.set('address', params.address)
+    if (params.network) query.set('network', params.network)
+    return listOf(await request<DepositAddressRecord[] | { items: DepositAddressRecord[] }>('GET', `/deposit-addresses?${query.toString()}`))
+  },
+
+  // Platform administration — customer accounts (admin-only on the
+  // server; the dashboard only shows this to staff users).
+  listCustomers: async (): Promise<CustomerAccount[]> =>
+    listOf(await request<CustomerAccount[] | { items: CustomerAccount[] }>('GET', '/admin/customers')),
+  createCustomer: (payload: { email: string; display_name?: string }) =>
+    request<CustomerCreated>('POST', '/admin/customers', payload),
 
   // Balances — integer base-unit strings, displayed raw by the views.
   getProjectBalances: (projectId: string) =>

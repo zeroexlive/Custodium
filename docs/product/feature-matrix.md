@@ -17,7 +17,8 @@ WaaS products are compared on). Status meanings:
 
 | Feature | Status | Where |
 |---|---|---|
-| Registration, email verification, password reset | Available | `/auth/*` |
+| Customer accounts: **admin-created only** (no public registration — removed 2026-11-14); platform owner / global admins create customers and deliver generated credentials (emailed + shown once) | **Changed 2026-11-14** | `POST/GET /admin/customers` (staff/superuser only); login, password reset, email verification under `/auth/*`; dashboard requires a server-confirmed session on every route |
+| Deposit addresses by customer UID (manual dashboard entry or API: UID + chain → address), address↔UID search with status + deposit summary | **Added 2026-11-14** | `POST/GET /deposit-addresses`; wallets (`external_customer_id` = the customer's UID) |
 | Organizations, projects (sandbox/production), team roles (owner/administrator/developer/finance_operator/withdrawal_approver/viewer) | Available | organizations, projects |
 | **Two-factor auth (TOTP) with recovery codes** | **Added 2026-11-13** | `/auth/2fa/setup|enable|disable|verify`; secret Fernet-encrypted, recovery codes stored as digests, login pauses at a signed 5-minute challenge |
 | API keys: create/rotate/revoke, scopes, secret shown once | Available | api_credentials |

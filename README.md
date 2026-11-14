@@ -155,9 +155,12 @@ npm install
 npm run dev                                     # http://localhost:5173
 ```
 
-Register a user from the dashboard, create an organization and project,
-then issue an API key (the secret is shown exactly once) to call the API —
-see *Authentication* below.
+There is no public registration: sign in as the superuser (the platform
+owner) and create customer accounts from the dashboard **Customers**
+page — each customer receives generated credentials to sign in with.
+Then create an organization and project, and issue an API key (the
+secret is shown exactly once) to call the API — see *Authentication*
+below.
 
 ### Option B — Docker Compose (PostgreSQL + Redis + Temporal dev server)
 

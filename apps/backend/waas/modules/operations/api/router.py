@@ -62,6 +62,10 @@ def _serialize(request_obj: WithdrawalRequest) -> dict:
     return {
         "id": str(request_obj.id),
         "wallet_id": str(request_obj.wallet_id),
+        # The customer UID that owns the source wallet (the UID on
+        # the customer's own platform), so a withdrawal — and via
+        # chain_tx_hash, its transaction — is traceable to a user.
+        "external_customer_id": request_obj.wallet.external_customer_id,
         "network": request_obj.network.slug,
         "asset": request_obj.asset.symbol,
         "destination_address": request_obj.destination_address,

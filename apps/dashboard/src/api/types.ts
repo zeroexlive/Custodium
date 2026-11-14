@@ -1,5 +1,18 @@
 /** Shared API types — mirror the Phase 1 Django Ninja contracts in docs/api. */
-export interface User { id: string; email: string; display_name?: string; is_email_verified?: boolean; totp_enabled?: boolean }
+export interface User { id: string; email: string; display_name?: string; is_email_verified?: boolean; totp_enabled?: boolean; is_staff?: boolean; is_superuser?: boolean }
+/** A platform customer account, as listed for platform administrators. */
+export interface CustomerAccount extends User { is_active?: boolean; date_joined?: string | null }
+/** Returned once when an administrator creates a customer: the
+ *  temporary password is shown to the admin a single time so it can
+ *  be delivered to the customer. It is never stored client-side. */
+export interface CustomerCreated extends CustomerAccount { temporary_password: string; credentials_email_sent: boolean }
+/** A deposit address bound to a customer end-user UID, with its
+ *  wallet status and observed-deposit summary for troubleshooting. */
+export interface DepositAddressRecord extends WalletAddress {
+  external_customer_id: string; wallet_status: string; wallet_label: string;
+  created?: boolean;
+  deposits: { count: number; held_count: number; credited_totals: { asset: string; amount: string }[] };
+}
 export interface Organization { id: string; name: string; slug?: string; role?: string; created_at?: string }
 export interface Project { id: string; organization_id: string; name: string; environment: 'sandbox' | 'production'; created_at?: string }
 export interface ApiKey {
@@ -30,7 +43,7 @@ export interface TransactionLookup {
   network: string; transaction_hash: string; status: string; indexed: boolean;
   belongs_to_tenant: boolean; block_or_slot?: string | number | null; timestamp?: string | null;
   confirmations?: number | null; matched_addresses: MatchedAddress[]; transfers: Transfer[];
-  tenant_record?: { type: string; transaction_id: string; wallet_id: string; external_customer_id?: string | null; status: string; held: boolean };
+  tenant_record?: { type: string; transaction_id: string; wallet_id: string; external_customer_id?: string | null; status: string; held: boolean; withdrawal_request_id?: string | null; external_reference?: string };
 }
 /** Deposits observed by the Phase 5 indexer for one wallet. Amounts are
  *  integer base-unit strings. `held` deposits (blacklisted sender) stay
@@ -134,7 +147,7 @@ export interface BlacklistCheckResult {
 
 /** Withdrawal operations (Phase 9). Amounts are integer base-unit strings. */
 export interface WithdrawalRequest {
-  id: string; wallet_id: string; network: string; asset: string;
+  id: string; wallet_id: string; external_customer_id?: string; network: string; asset: string;
   destination_address: string; amount: string; status: string;
   status_reason: string; external_reference: string;
   approvals_required: number; approvals_received: number;

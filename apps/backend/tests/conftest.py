@@ -13,13 +13,20 @@ PASSWORD = "Str0ng!Passw0rd"
 
 
 def register_user(client: Client, email: str) -> dict:
-    response = client.post(
-        "/api/v1/auth/register",
-        data=json.dumps({"email": email, "password": PASSWORD, "display_name": "Test"}),
-        content_type="application/json",
-    )
-    assert response.status_code == 201, response.content
-    return response.json()
+    """Create a dashboard user directly in the database and issue a
+    session token. Public registration no longer exists (accounts
+    are platform-admin-created), so tests provision users the same
+    way an admin-created account lands in the database, then use the
+    real login/session machinery from there."""
+    from waas.modules.identity.models import DashboardToken, User
+
+    user = User.objects.create_user(email=email, password=PASSWORD, display_name="Test")
+    _, raw = DashboardToken.issue(user)
+    return {
+        "access_token": raw,
+        "token": raw,
+        "user": {"id": str(user.id), "email": user.email},
+    }
 
 
 def auth_headers(token: str) -> dict:

@@ -87,8 +87,11 @@ issued.
 
 ## First-run walkthrough (both paths)
 
-1. Open the dashboard → **Register** the first user (use a real
-   mailbox format; dev email verification is logged, not sent).
+1. There is **no public registration**. Create the platform owner
+   once with `manage.py createsuperuser`, sign in, and create
+   customer accounts from the dashboard **Customers** page — each
+   customer receives a generated temporary password by email (and
+   shown to the admin once). Customers only ever sign in.
 2. Create an **organization**, then a **project** (environment:
    `sandbox` for testnets).
 3. **API Keys → Create**: choose scopes (start with `read`,
@@ -137,7 +140,7 @@ cd apps/dashboard && npx vitest run       # 9 passed
 
 ## Troubleshooting
 
-**The dashboard loads, but register/login (any API action) shows
+**The dashboard loads, but login (any API action) shows
 error 500.** The page loading only proves the *dashboard*
 container is up — API calls go through its proxy to the backend,
 and a dead backend surfaces as a proxy 500. Work from the API
@@ -146,12 +149,12 @@ outward:
 ```bash
 docker compose ps                    # is backend "up (healthy)"?
 docker compose logs --tail=80 backend
-curl -X POST localhost:8000/api/v1/auth/register \
+curl -X POST localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"a@b.co","password":"<redacted>","display_name":"A"}'
+  -d '{"email":"a@b.co","password":"wrong-password"}'   # 401 from a live backend (bad credentials) proves it is up; a 500 means it is not
 ```
 
-- The `curl` returns **201** → the backend is fine; the problem
+- The `curl` returns **401** → the backend is fine; the problem
   is the dashboard→backend path (check `docker compose logs
   dashboard` and that the stack was built from a current checkout).
 - The `curl` also fails, or `backend` is `Restarting`/`Exited` →
