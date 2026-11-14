@@ -24,6 +24,16 @@ class ResolveIn(Schema):
     network: str  # network slug
 
 
+class DepositAddressIn(Schema):
+    """Create (or return) the deposit address for one of the
+    customer's end users, identified by the customer's own UID
+    (``external_customer_id``), on one network."""
+
+    project_id: str | None = None  # dashboard auth only; machine keys imply it
+    external_customer_id: str
+    network: str  # network slug
+
+
 def wallet_out(wallet: object) -> dict:
     return {
         "id": str(wallet.id),  # type: ignore[attr-defined]

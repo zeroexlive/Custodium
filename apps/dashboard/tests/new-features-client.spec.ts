@@ -122,3 +122,39 @@ describe('auth store two-factor flow', () => {
     })
   })
 })
+
+describe('access control + UID workflow endpoints (client)', () => {
+  beforeEach(() => { vi.restoreAllMocks() })
+
+  it('there is no public registration call in the client', () => {
+    expect((api as unknown as Record<string, unknown>).register).toBeUndefined()
+  })
+
+  it('createDepositAddress posts UID + chain to /deposit-addresses', async () => {
+    const fetchMock = captureFetch({ address: '0xabc', created: true })
+    const result = await api.createDepositAddress({
+      project_id: 'p1', external_customer_id: 'user-42', network: 'ethereum',
+    })
+    const [url, init] = lastCall(fetchMock)
+    expect(url).toBe('/api/v1/deposit-addresses')
+    expect(JSON.parse(String(init.body))).toEqual({
+      project_id: 'p1', external_customer_id: 'user-42', network: 'ethereum',
+    })
+    expect(result.address).toBe('0xabc')
+  })
+
+  it('listDepositAddresses builds the search query', async () => {
+    const fetchMock = captureFetch({ items: [] })
+    await api.listDepositAddresses({ project_id: 'p1', address: '0xAbC' })
+    expect(lastCall(fetchMock)[0]).toBe('/api/v1/deposit-addresses?project_id=p1&address=0xAbC')
+  })
+
+  it('createCustomer posts to the admin endpoint', async () => {
+    const fetchMock = captureFetch({ temporary_password: 'Temp!234', credentials_email_sent: true })
+    const result = await api.createCustomer({ email: 'c@example.com', display_name: 'C' })
+    const [url] = lastCall(fetchMock)
+    expect(url).toBe('/api/v1/admin/customers')
+    expect(result.temporary_password).toBe('Temp!234')
+    expect(result.credentials_email_sent).toBe(true)
+  })
+})

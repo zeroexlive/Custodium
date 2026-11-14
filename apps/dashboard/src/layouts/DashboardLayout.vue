@@ -52,10 +52,21 @@ const groups: NavGroup[] = [
   },
 ]
 
+const allGroups = computed<NavGroup[]>(() => {
+  // Customer-account management is a platform-team function: the
+  // entry appears only for the platform owner / global admins (the
+  // server enforces the same rule on the API).
+  if (!auth.isPlatformAdmin) return groups
+  return [
+    ...groups,
+    { title: 'Platform', items: [{ to: '/customers', label: 'Customers', icon: 'users' }] },
+  ]
+})
+
 const visibleGroups = computed(() => {
   const q = navQuery.value.trim().toLowerCase()
-  if (!q) return groups
-  return groups
+  if (!q) return allGroups.value
+  return allGroups.value
     .map((g) => ({ ...g, items: g.items.filter((i) => i.label.toLowerCase().includes(q)) }))
     .filter((g) => g.items.length > 0)
 })

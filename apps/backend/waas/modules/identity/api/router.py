@@ -17,11 +17,11 @@ from waas.api.authentication import DashboardAuth
 from waas.modules.audit.models import AuditEvent
 from waas.modules.identity.api.schemas import (
     AuthOut,
+    CustomerCreateIn,
     DetailOut,
     LoginIn,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
-    RegisterIn,
     TokenIn,
     TotpCodeIn,
     TotpVerifyIn,
@@ -70,26 +70,122 @@ def _issue_session(user: User) -> dict:
     return {"access_token": raw, "token": raw, "user": user_out(user)}
 
 
-@router.post("/auth/register", response={201: AuthOut}, auth=None)
-def register(request, payload: RegisterIn):
+# ---------------------------------------------------------------------------
+# Customer accounts are ADMIN-CREATED ONLY. There is deliberately no
+# public registration endpoint: the platform owner and global
+# administrators (Django staff / superusers) create customer accounts
+# and deliver the generated credentials. Customers can only log in.
+# ---------------------------------------------------------------------------
+
+
+def _require_platform_admin(request) -> User:
+    user = request.auth
+    if user is None or not (user.is_staff or user.is_superuser):
+        raise HttpError(
+            403,
+            "Only the platform owner or a global administrator can manage customer accounts",
+        )
+    return user
+
+
+def _generate_temporary_password() -> str:
+    """A generated password that satisfies the configured validators
+    (upper + lower + digit + symbol, 20 chars)."""
+    import string
+
+    symbols = "!@#$%^&*"
+    alphabet = string.ascii_letters + string.digits + symbols
+    while True:
+        candidate = "".join(_secrets.choice(alphabet) for _ in range(20))
+        if (
+            any(c.islower() for c in candidate)
+            and any(c.isupper() for c in candidate)
+            and any(c.isdigit() for c in candidate)
+            and any(c in symbols for c in candidate)
+        ):
+            return candidate
+
+
+def _send_credentials_email(user: User, temporary_password: str) -> bool:
+    """Email the new customer their login credentials. Returns False
+    when delivery fails (e.g. no mail server configured) — the admin
+    still receives the password once in the API response and can
+    deliver it through another channel."""
+    from django.core.mail import send_mail
+
+    try:
+        send_mail(
+            subject="Your Custodium account",
+            message=(
+                f"Hello,\n\n"
+                f"A Custodium account has been created for you by the platform team.\n\n"
+                f"Login email: {user.email}\n"
+                f"Temporary password: {temporary_password}\n\n"
+                f"Sign in with these credentials, then set your own password via "
+                f"the password-reset flow and enable two-factor authentication.\n"
+            ),
+            from_email=None,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        return True
+    except Exception:  # mail transport is deployment-configured; never block creation
+        return False
+
+
+@router.post(
+    "/admin/customers",
+    response={201: dict, 403: dict, 409: dict, 422: dict},
+    auth=dashboard_auth,
+)
+def create_customer(request, payload: CustomerCreateIn):
+    admin = _require_platform_admin(request)
     email = payload.email.strip().lower()
     if User.objects.filter(email=email).exists():
-        raise HttpError(409, "Email already registered")
+        raise HttpError(409, "A user with that email already exists")
+    temporary_password = _generate_temporary_password()
     user = User(email=email, display_name=payload.display_name or "")
     try:
-        validate_password(payload.password, user=user)
-    except ValidationError as exc:
+        validate_password(temporary_password, user=user)
+    except ValidationError as exc:  # pragma: no cover - generator satisfies validators
         raise HttpError(422, "; ".join(exc.messages)) from exc
-    user.set_password(payload.password)
+    user.set_password(temporary_password)
+    # The platform team vouches for the address it registered.
+    user.is_email_verified = True
     user.save()
-    _, verification_raw = OneTimeToken.issue(
-        user, OneTimeToken.Purpose.EMAIL_VERIFICATION, settings.EMAIL_VERIFICATION_TTL_HOURS
+    email_sent = _send_credentials_email(user, temporary_password)
+    AuditEvent.record(
+        "user.created_by_admin",
+        actor_user=admin,
+        metadata={
+            "customer_id": str(user.id),
+            "customer_email": user.email,
+            "credentials_email_sent": email_sent,
+        },
     )
-    AuditEvent.record("user.registered", actor_user=user)
-    result = _issue_session(user)
-    if getattr(settings, "EXPOSE_TOKEN_IN_RESPONSE", False):
-        result["verification_token"] = verification_raw
+    result = user_out(user)
+    # Shown exactly once, to the creating administrator only, so the
+    # credentials can be delivered to the customer. Never stored in
+    # plaintext anywhere; only the password hash persists.
+    result["temporary_password"] = temporary_password
+    result["credentials_email_sent"] = email_sent
     return Status(201, result)
+
+
+@router.get("/admin/customers", response=dict, auth=dashboard_auth)
+def list_customers(request):
+    _require_platform_admin(request)
+    from waas.common.pagination import paginated
+
+    users = User.objects.all().order_by("date_joined")
+    return paginated(
+        {
+            **user_out(u),
+            "is_active": u.is_active,
+            "date_joined": u.date_joined.isoformat() if u.date_joined else None,
+        }
+        for u in users
+    )
 
 
 @router.post("/auth/login", response=AuthOut, auth=None)

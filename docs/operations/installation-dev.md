@@ -162,8 +162,12 @@ Details and the recorded run:
 
 ## First-run walkthrough (all paths)
 
-1. Open the dashboard → **Register** (dev email verification is
-   logged / returned in responses, not mailed).
+1. There is **no public registration**. Create the platform owner
+   once with `manage.py createsuperuser`, sign in, and create
+   customer accounts from the dashboard **Customers** page (or
+   `POST /api/v1/admin/customers`): each customer receives a
+   generated temporary password by email (and shown to the admin
+   once). Customers only ever sign in.
 2. Create an **organization**, then a **project** (environment
    `sandbox` for testnets).
 3. *(Recommended)* enable **two-factor authentication** for your
@@ -216,7 +220,7 @@ curl localhost:8000/readyz      # {"status":"ready"}
 
 ## Troubleshooting
 
-**Dashboard loads but register/login (any API action) shows
+**Dashboard loads but login (any API action) shows
 500.** The page loading proves only the *dashboard* is up; API
 calls proxy to the backend, and a dead backend surfaces as a
 proxy 500. Work outward from the API:
@@ -224,9 +228,9 @@ proxy 500. Work outward from the API:
 ```bash
 docker compose ps                    # backend "up (healthy)"?
 docker compose logs --tail=80 backend
-curl -X POST localhost:8000/api/v1/auth/register \
+curl -X POST localhost:8000/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"a@b.co","password":"<redacted>","display_name":"A"}'
+  -d '{"email":"a@b.co","password":"wrong-password"}'   # 401 from a live backend (bad credentials) proves it is up; a 500 means it is not
 ```
 
 - `curl` returns **201** → backend is fine; check the dashboard

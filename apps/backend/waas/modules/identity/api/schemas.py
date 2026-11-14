@@ -3,9 +3,13 @@ from __future__ import annotations
 from ninja import Schema
 
 
-class RegisterIn(Schema):
+class CustomerCreateIn(Schema):
+    """Platform-admin customer creation. There is NO public
+    registration: accounts are created only by the platform owner /
+    global administrators, who receive the generated temporary
+    password once and deliver it to the customer."""
+
     email: str
-    password: str
     display_name: str | None = ""
 
 
@@ -20,6 +24,8 @@ class UserOut(Schema):
     display_name: str = ""
     is_email_verified: bool = False
     totp_enabled: bool = False
+    is_staff: bool = False
+    is_superuser: bool = False
 
 
 class TotpCodeIn(Schema):
@@ -40,9 +46,6 @@ class AuthOut(Schema):
     requires_totp: bool = False
     mfa_token: str | None = None
     user: UserOut
-    # Present only in development/testing settings (EXPOSE_TOKEN_IN_RESPONSE),
-    # so the verification flow can be exercised without a mail server.
-    verification_token: str | None = None
 
 
 class TokenIn(Schema):
@@ -70,4 +73,6 @@ def user_out(user: object) -> dict:
         "display_name": user.display_name or "",  # type: ignore[attr-defined]
         "is_email_verified": bool(user.is_email_verified),  # type: ignore[attr-defined]
         "totp_enabled": bool(user.totp_enabled),  # type: ignore[attr-defined]
+        "is_staff": bool(getattr(user, "is_staff", False)),  # type: ignore[attr-defined]
+        "is_superuser": bool(getattr(user, "is_superuser", False)),  # type: ignore[attr-defined]
     }

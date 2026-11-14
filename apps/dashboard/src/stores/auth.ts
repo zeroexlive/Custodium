@@ -14,6 +14,8 @@ export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({ user: null, token: restore(), loading: false, error: null, mfaToken: null }),
   getters: {
     isAuthenticated: (s): boolean => s.token !== null || s.user !== null,
+    /** Platform owner / global administrators manage customer accounts. */
+    isPlatformAdmin: (s): boolean => Boolean(s.user?.is_staff || s.user?.is_superuser),
   },
   actions: {
     init(): void { setAuthToken(this.token) },
@@ -56,20 +58,19 @@ export const useAuthStore = defineStore('auth', {
         throw e
       } finally { this.loading = false }
     },
-    async register(email: string, password: string, displayName?: string): Promise<void> {
-      this.loading = true; this.error = null
-      try {
-        const res = await api.register({ email, password, display_name: displayName })
-        if (res.access_token ?? res.token) this.persist(res.access_token ?? res.token ?? null)
-        this.user = res.user ?? null
-      } catch (e) {
-        this.error = e instanceof Error ? e.message : 'Registration failed'
-        throw e
-      } finally { this.loading = false }
-    },
     async fetchMe(): Promise<void> {
       if (!this.token) return
       try { this.user = await api.me() } catch { this.persist(null); this.user = null }
+    },
+    /** The dashboard's authentication gate: a session counts only
+     *  when the server confirms it. A stored token is validated
+     *  against /me; anything else (no token, an expired or revoked
+     *  token, stray cookies) is NOT a session. */
+    async ensureSession(): Promise<boolean> {
+      if (this.user) return true
+      if (!this.token) return false
+      await this.fetchMe()
+      return this.user !== null
     },
     async logout(): Promise<void> {
       try { await api.logout() } catch { /* local logout must still succeed */ }

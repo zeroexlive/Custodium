@@ -3,6 +3,9 @@ import { useAuthStore } from '@/stores/auth'
 
 const routes: RouteRecordRaw[] = [
   { path: '/login', name: 'login', component: () => import('@/features/authentication/LoginView.vue'), meta: { public: true } },
+  // Registration is closed (accounts are admin-created); the path
+  // stays as a public signpost so old links explain that instead
+  // of silently landing on the dashboard.
   { path: '/register', name: 'register', component: () => import('@/features/authentication/RegisterView.vue'), meta: { public: true } },
   {
     path: '/', component: () => import('@/layouts/DashboardLayout.vue'),
@@ -27,6 +30,7 @@ const routes: RouteRecordRaw[] = [
       { path: 'webhooks', name: 'webhooks', component: () => import('@/features/webhooks/WebhooksView.vue') },
       { path: 'billing', name: 'billing', component: () => import('@/features/billing/BillingView.vue') },
       { path: 'team', name: 'team', component: () => import('@/features/team/TeamView.vue') },
+      { path: 'customers', name: 'customers', component: () => import('@/features/admin/CustomersView.vue') },
       { path: 'webhooks', name: 'webhooks', component: () => import('@/features/webhooks/WebhooksView.vue') },
       { path: 'audit', name: 'audit', component: () => import('@/features/audit/AuditView.vue') },
     ],
@@ -36,15 +40,20 @@ const routes: RouteRecordRaw[] = [
 
 const router = createRouter({ history: createWebHistory(), routes })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  // Cookie-based sessions may exist without a stored token, so only
-  // redirect-away from auth pages when we positively know we're signed in.
-  if (to.meta.public) return true
-  // Protected pages render their own API errors; if there is no session
-  // hint at all, send the user to login.
-  const hasSessionHint = auth.isAuthenticated || document.cookie.length > 0
-  if (!hasSessionHint && !import.meta.env.DEV) return { name: 'login' }
+  if (to.meta.public) {
+    // The only public page is login; an already-authenticated user
+    // goes straight to the dashboard.
+    if (to.name === 'login' && (await auth.ensureSession())) return { path: '/' }
+    return true
+  }
+  // Every dashboard route requires a server-confirmed session. A
+  // stored token is validated against the API before any protected
+  // page renders; cookies, dev mode, or a bare token string are
+  // never treated as proof of authentication.
+  const ok = await auth.ensureSession()
+  if (!ok) return { name: 'login', query: { redirect: to.fullPath } }
   return true
 })
 

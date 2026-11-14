@@ -259,6 +259,20 @@ def _tenant_projection(
         )
     if withdrawal is not None:
         wallet = withdrawal.wallet
+        # Link back to the business withdrawal request (when this
+        # chain transaction executed one) so the caller can identify
+        # exactly which customer UID requested the withdrawal: the
+        # UID is the wallet's external_customer_id, and the request
+        # carries the customer's own external_reference.
+        from waas.modules.operations.models import WithdrawalRequest
+
+        linked_request = (
+            WithdrawalRequest.objects.filter(
+                chain_tx_hash=tx_hash, project__in=projects
+            )
+            .order_by("created_at")
+            .first()
+        )
         return {
             "network": network.slug,
             "transaction_hash": tx_hash,
@@ -294,6 +308,12 @@ def _tenant_projection(
                 "external_customer_id": wallet.external_customer_id,
                 "status": withdrawal.status,
                 "held": False,
+                "withdrawal_request_id": (
+                    str(linked_request.id) if linked_request is not None else None
+                ),
+                "external_reference": (
+                    linked_request.external_reference if linked_request is not None else ""
+                ),
             },
         }
     return None

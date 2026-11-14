@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/ui/Button.vue'
 import Input from '@/components/ui/Input.vue'
@@ -9,20 +9,25 @@ import Card from '@/components/ui/Card.vue'
 const email = ref(''); const password = ref(''); const code = ref('')
 const error = ref<string | null>(null)
 const step = ref<'credentials' | 'totp'>('credentials')
-const auth = useAuthStore(); const router = useRouter()
+const auth = useAuthStore(); const router = useRouter(); const route = useRoute()
+
+function destination(): string {
+  const target = route.query.redirect
+  return typeof target === 'string' && target.startsWith('/') ? target : '/'
+}
 
 async function submit(): Promise<void> {
   error.value = null
   try {
     const outcome = await auth.login(email.value, password.value)
     if (outcome === 'totp') { step.value = 'totp'; return }
-    await router.push('/')
+    await router.push(destination())
   } catch (e) { error.value = e instanceof Error ? e.message : 'Login failed' }
 }
 
 async function submitCode(): Promise<void> {
   error.value = null
-  try { await auth.completeTotp(code.value.trim()); await router.push('/') }
+  try { await auth.completeTotp(code.value.trim()); await router.push(destination()) }
   catch (e) { error.value = e instanceof Error ? e.message : 'Two-factor verification failed' }
 }
 </script>
@@ -34,7 +39,11 @@ async function submitCode(): Promise<void> {
         <Input id="password" v-model="password" label="Password" type="password" required autocomplete="current-password" />
         <p v-if="error" role="alert" class="text-sm text-danger">{{ error }}</p>
         <Button type="submit" :disabled="auth.loading">Log in</Button>
-        <p class="text-sm">No account? <RouterLink to="/register" class="underline">Register</RouterLink></p>
+        <p class="text-sm text-ink-muted">
+          Accounts are created by the Custodium platform team — there is no
+          public sign-up. If you need an account, ask your platform
+          administrator to create one and send you your credentials.
+        </p>
       </form>
       <form v-else class="space-y-4" @submit.prevent="submitCode">
         <p class="text-sm text-ink-muted">
